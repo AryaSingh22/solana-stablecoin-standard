@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+target
+.git
+.gemini
+trident-tests
+.anchor
+test-ledger
+sdk
+cli
+programs
+tests
+patches
+*.md
+.env
+.env.*

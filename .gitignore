@@ -1,0 +1,44 @@
+# Build artifacts
+target/
+dist/
+build/
+.anchor/
+
+# Node
+node_modules/
+*.tsbuildinfo
+
+# Solana keypairs — NEVER commit these
+*.json
+!package.json
+!package-lock.json
+!tsconfig*.json
+!anchor.json
+!Anchor.toml
+!vitest.config.ts
+
+# Test keypairs specifically
+test-keypair.json
+id.json
+
+# Logs generated during development
+*.log
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+
+# Solana test validator
+test-ledger/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Deployment artifacts
+v0.30.1.tar.gz

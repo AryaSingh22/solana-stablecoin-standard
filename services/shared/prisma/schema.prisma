@@ -1,0 +1,189 @@
+// Prisma schema for the Solana Stablecoin Standard backend services.
+// Provides persistent storage for token operations, compliance events,
+// webhook delivery, and indexer state.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Token & Mint Records
+// ============================================================================
+
+/// Tracks all stablecoins managed by the system.
+model Stablecoin {
+  id                     String   @id @default(cuid())
+  mint                   String   @unique
+  name                   String
+  symbol                 String
+  decimals               Int
+  authority              String
+  enablePermanentDelegate Boolean @default(false) @map("enable_permanent_delegate")
+  enableTransferHook     Boolean  @default(false) @map("enable_transfer_hook")
+  defaultAccountFrozen   Boolean  @default(false) @map("default_account_frozen")
+  paused                 Boolean  @default(false)
+  totalMinted            BigInt   @default(0) @map("total_minted")
+  totalBurned            BigInt   @default(0) @map("total_burned")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  mintOperations   MintOperation[]
+  burnOperations   BurnOperation[]
+  complianceEvents ComplianceEvent[]
+  webhooks         Webhook[]
+
+  @@map("stablecoins")
+}
+
+/// Tracks mint operations for auditing and quota management.
+model MintOperation {
+  id          String   @id @default(cuid())
+  stablecoin  Stablecoin @relation(fields: [stablecoinId], references: [id])
+  stablecoinId String  @map("stablecoin_id")
+  mint        String
+  minter      String
+  recipient   String
+  amount      BigInt
+  signature   String   @unique
+  slot        BigInt
+  status      OperationStatus @default(CONFIRMED)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([mint, minter])
+  @@index([signature])
+  @@map("mint_operations")
+}
+
+/// Tracks burn operations for auditing.
+model BurnOperation {
+  id          String   @id @default(cuid())
+  stablecoin  Stablecoin @relation(fields: [stablecoinId], references: [id])
+  stablecoinId String  @map("stablecoin_id")
+  mint        String
+  burner      String
+  amount      BigInt
+  signature   String   @unique
+  slot        BigInt
+  status      OperationStatus @default(CONFIRMED)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([mint, burner])
+  @@map("burn_operations")
+}
+
+// ============================================================================
+// Compliance
+// ============================================================================
+
+/// Tracks compliance events (blacklist, freeze, seize, pause).
+model ComplianceEvent {
+  id          String   @id @default(cuid())
+  stablecoin  Stablecoin @relation(fields: [stablecoinId], references: [id])
+  stablecoinId String  @map("stablecoin_id")
+  mint        String
+  eventType   ComplianceEventType @map("event_type")
+  target      String?
+  operator    String
+  reason      String?
+  amount      BigInt?
+  signature   String   @unique
+  slot        BigInt
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([mint, eventType])
+  @@index([target])
+  @@map("compliance_events")
+}
+
+// ============================================================================
+// Webhooks
+// ============================================================================
+
+/// Webhook endpoint registration.
+model Webhook {
+  id          String   @id @default(cuid())
+  stablecoin  Stablecoin @relation(fields: [stablecoinId], references: [id])
+  stablecoinId String  @map("stablecoin_id")
+  url         String
+  secret      String
+  events      String[]
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  deliveries  WebhookDelivery[]
+
+  @@map("webhooks")
+}
+
+/// Webhook delivery attempts.
+model WebhookDelivery {
+  id          String   @id @default(cuid())
+  webhook     Webhook  @relation(fields: [webhookId], references: [id])
+  webhookId   String   @map("webhook_id")
+  event       String
+  payload     Json
+  status      DeliveryStatus @default(PENDING)
+  attempts    Int      @default(0)
+  lastAttempt DateTime? @map("last_attempt")
+  nextRetry   DateTime? @map("next_retry")
+  response    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([webhookId, status])
+  @@index([nextRetry])
+  @@map("webhook_deliveries")
+}
+
+// ============================================================================
+// Indexer State
+// ============================================================================
+
+/// Tracks indexer cursor position for resumable processing.
+model IndexerState {
+  id          String   @id @default(cuid())
+  programId   String   @unique @map("program_id")
+  lastSlot    BigInt   @map("last_slot")
+  lastSignature String? @map("last_signature")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("indexer_state")
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum OperationStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+
+  @@map("operation_status")
+}
+
+enum ComplianceEventType {
+  BLACKLIST_ADD
+  BLACKLIST_REMOVE
+  FREEZE
+  THAW
+  SEIZE
+  PAUSE
+  UNPAUSE
+
+  @@map("compliance_event_type")
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  RETRYING
+
+  @@map("delivery_status")
+}

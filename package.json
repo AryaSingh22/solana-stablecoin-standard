@@ -1,0 +1,41 @@
+{
+  "name": "solana-stablecoin-standard",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "sdk",
+    "cli",
+    "services/shared",
+    "services/mint-service",
+    "services/indexer",
+    "services/compliance-service",
+    "services/webhook-service",
+    "tests"
+  ],
+  "scripts": {
+    "build": "yarn workspaces run build",
+    "test": "yarn workspaces run test",
+    "test:unit": "npx cross-env ANCHOR_WALLET=$HOME/.config/solana/id.json ANCHOR_PROVIDER_URL=http://127.0.0.1:8899 npx ts-mocha tests/unit/*.test.ts",
+    "test:cargo": "cargo test --workspace",
+    "lint": "yarn workspaces run lint",
+    "typecheck": "yarn workspaces run typecheck"
+  },
+  "devDependencies": {
+    "@types/chai": "^5.2.3",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.0.0",
+    "chai": "^6.2.2",
+    "cross-env": "^10.1.0",
+    "mocha": "^5.0.5",
+    "ts-mocha": "^11.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "eslint": "10.0.1",
+    "fastify": "^4.26.2"
+  }
+}

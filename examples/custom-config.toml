@@ -1,0 +1,12 @@
+# Example Custom Token Configuration
+# Use with: sss-cli init --custom examples/custom-config.toml
+
+name = "USD Stablecoin"
+symbol = "USDS"
+uri  = "https://meta.example.com/usds.json"
+decimals = 6
+preset = "sss1"
+
+# Optional SSS-2 fields (uncomment for compliance features):
+# preset = "sss2"
+# hook_program = "Hook111111111111111111111111111111111111111"

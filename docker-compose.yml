@@ -1,0 +1,93 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sss
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?err_POSTGRES_PASSWORD_must_be_set}
+      POSTGRES_DB: sss_db
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U sss" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mint-service:
+    build:
+      context: .
+      dockerfile: services/mint-service/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://sss:sss_dev_password@postgres:5432/sss_db
+      REDIS_URL: redis://redis:6379
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL}
+      SSS_PROGRAM_ID: ${SSS_PROGRAM_ID}
+      MINTER_KEYPAIR: ${MINTER_KEYPAIR}
+      PORT: 3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3001/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  indexer:
+    build:
+      context: .
+      dockerfile: services/indexer/Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      DATABASE_URL: postgresql://sss:sss_dev_password@postgres:5432/sss_db
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL}
+      SSS_PROGRAM_ID: ${SSS_PROGRAM_ID}
+      PORT: 3002
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  compliance-service:
+    build:
+      context: .
+      dockerfile: services/compliance-service/Dockerfile
+    ports:
+      - "3003:3003"
+    environment:
+      DATABASE_URL: postgresql://sss:sss_dev_password@postgres:5432/sss_db
+      PORT: 3003
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  webhook-service:
+    build:
+      context: .
+      dockerfile: services/webhook-service/Dockerfile
+    ports:
+      - "3004:3004"
+    environment:
+      DATABASE_URL: postgresql://sss:sss_dev_password@postgres:5432/sss_db
+      REDIS_URL: redis://redis:6379
+      PORT: 3004
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
