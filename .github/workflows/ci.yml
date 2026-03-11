@@ -37,7 +37,9 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          curl -sSfL --retry 5 --retry-delay 2 --retry-connrefused -o install_solana.sh https://release.solana.com/stable/install
+          for i in 1 2 3 4 5; do
+            curl -sSfL -o install_solana.sh https://release.solana.com/stable/install && break || sleep 5
+          done
           sh install_solana.sh
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
