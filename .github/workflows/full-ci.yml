@@ -82,3 +82,8 @@ jobs:
           curl -f http://localhost:3004/health
       - name: Stop services
         run: docker compose down
+        env:
+          POSTGRES_PASSWORD: sss_dev_password
+          SOLANA_RPC_URL: http://localhost:8899
+          SSS_PROGRAM_ID: SSS11111111111111111111111111111111111111111
+          MINTER_KEYPAIR: '[1,2,3]'
