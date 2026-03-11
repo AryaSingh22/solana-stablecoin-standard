@@ -1,0 +1,6 @@
+
+Port 3000 : NOT RESPONDING - Unable to connect to the remote server
+Port 3001 : HTTP 200 - {"status":"ok","service":"mint-service","uptime":2197.273533589,"version":"0.1.0","timestamp":"2026-03-11T13:09:09.109Z"}
+Port 3002 : HTTP 200 - {"status":"ok","service":"indexer","uptime":2197.741771459,"version":"0.1.0","timestamp":"2026-03-11T13:09:09.577Z"}
+Port 3003 : HTTP 200 - {"status":"ok","service":"compliance-service","uptime":2198.259214326,"version":"0.1.0","timestamp":"2026-03-11T13:09:10.080Z"}
+Port 3004 : HTTP 200 - {"status":"ok","service":"webhook-service","uptime":2198.382777448,"version":"0.1.0","timestamp":"2026-03-11T13:09:10.204Z","queue":{"waiting":0,"active":0,"failed":0}}
