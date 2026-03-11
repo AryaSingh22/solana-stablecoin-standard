@@ -1,0 +1,59 @@
+﻿node.exe : Γû▓ [WARNING] The 
+condition "types" here will never 
+be used as it comes after both 
+"import" and "require" 
+[package.json]
+At C:\Program 
+Files\nodejs\npx.ps1:29 char:3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotS 
+   pecified: (Γû▓ [WARNING] T...   
+  [package.json]:String) [], Rem   
+ oteException
+    + FullyQualifiedErrorId : Nati 
+   veCommandError
+ 
+
+    package.json:13:12:
+      13 Γöé             "types": 
+"./dist/index.d.ts"
+         Γò╡             ~~~~~~~
+
+  The "import" condition comes 
+earlier and will be used for all 
+"import" statements:
+
+    package.json:11:12:
+      11 Γöé             "import": 
+"./dist/index.mjs",
+         Γò╡             ~~~~~~~~
+
+  The "require" condition comes 
+earlier and will be used for all 
+"require" calls:
+
+    package.json:12:12:
+      12 Γöé             
+"require": "./dist/index.js",
+         Γò╡             ~~~~~~~~~
+
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Pro/Bounty Projects/Solana StableCoin Standard/solana-stablecoin-standard/sdk[39m
+
+ [32mΓ£ô[39m tests/types.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m tests/errors.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m tests/client.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mΓ£ô[39m tests/presets.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mΓ£ô[39m tests/sss3.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32mΓ£ô[39m tests/pda.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 84[2mms[22m[39m
+ [32mΓ£ô[39m tests/oracle.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 228[2mms[22m[39m
+ [32mΓ£ô[39m tests/integration.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 383[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m config PDA cannot collide with pause PDA [33m 331[2mms[22m[39m
+ [32mΓ£ô[39m tests/compliance.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m9 passed[39m[22m[90m (9)[39m
+[2m      Tests [22m [1m[32m100 passed[39m[22m[90m (100)[39m
+[2m   Start at [22m 19:11:24
+[2m   Duration [22m 2.72s[2m (transform 2.77s, setup 0ms, import 8.45s, tests 809ms, environment 14ms)[22m
+

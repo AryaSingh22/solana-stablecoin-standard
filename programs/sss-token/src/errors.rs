@@ -135,4 +135,8 @@ pub enum SssError {
     /// The token operations are not currently paused — cannot unpause.
     #[msg("Not paused: token operations are not currently suspended")]
     NotPaused,
+
+    /// The allowlist entry for this wallet is not active (SSS-3).
+    #[msg("Allowlist entry not active: the allowlist entry for this wallet has been deactivated")]
+    AllowlistEntryNotActive,
 }

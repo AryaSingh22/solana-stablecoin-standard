@@ -6,6 +6,8 @@
 //! - **SSS-1**: Basic stablecoin with mint, burn, freeze, pause, and role management.
 //! - **SSS-2**: Enhanced compliance stablecoin with blacklist, seize (via permanent
 //!   delegate), and transfer hook integration for real-time compliance checks.
+//! - **SSS-3**: Private stablecoin with confidential transfers and allowlist-based
+//!   access control using SPL Token-2022 extensions.
 //!
 //! ## Architecture
 //!
@@ -140,5 +142,43 @@ pub mod sss_token {
     /// Uses permanent delegate authority to transfer without owner consent.
     pub fn seize<'info>(ctx: Context<'_, '_, '_, 'info, Seize<'info>>) -> Result<()> {
         instructions::seize::seize_handler(ctx)
+    }
+
+    // ====================================================================
+    // SSS-3 Instructions — Private Stablecoin
+    // ====================================================================
+
+    /// Adds a wallet to the allowlist (SSS-3 only).
+    ///
+    /// Feature-gated: requires enable_allowlist.
+    /// Only MasterAuthority can manage the allowlist.
+    pub fn add_to_allowlist_v3(ctx: Context<AddToAllowlist>) -> Result<()> {
+        instructions::allowlist::add_to_allowlist_handler(ctx)
+    }
+
+    /// Removes a wallet from the allowlist (SSS-3 only).
+    ///
+    /// Feature-gated: requires enable_allowlist.
+    /// Only MasterAuthority can manage the allowlist.
+    pub fn remove_from_allowlist_v3(ctx: Context<RemoveFromAllowlist>) -> Result<()> {
+        instructions::allowlist::remove_from_allowlist_handler(ctx)
+    }
+
+    /// Configures a token account for confidential transfers (SSS-3 only).
+    ///
+    /// Feature-gated: requires enable_confidential_transfers.
+    pub fn configure_confidential_account(
+        ctx: Context<ConfigureConfidentialAccount>,
+    ) -> Result<()> {
+        instructions::confidential::configure_confidential_account_handler(ctx)
+    }
+
+    /// Applies pending confidential balance credits (SSS-3 only).
+    ///
+    /// Feature-gated: requires enable_confidential_transfers.
+    pub fn apply_pending_balance(
+        ctx: Context<ApplyPendingBalance>,
+    ) -> Result<()> {
+        instructions::confidential::apply_pending_balance_handler(ctx)
     }
 }

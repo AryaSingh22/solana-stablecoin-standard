@@ -1,330 +1,183 @@
 # API Reference
 
-## REST API Endpoints
-
-All backend services expose JSON APIs over HTTP.
+The Solana Stablecoin Standard (SSS) backend is composed of four distinct microservices exposing RESTful JSON APIs.
 
 ---
 
-## Mint Service (Port 3001)
+## 1. Mint Service (Port 3001)
+
+Handles minting, burning, and quota tracking.
 
 ### `POST /mint`
-Submit a mint request.
+Mint tokens to a recipient (enforces MinterQuota on-chain).
 
-**Request Body:**
+**Request Schema:**
 ```json
 {
-  "mintAddress": "public key",
-  "recipient": "public key",
-  "amount": "string (raw units)"
+  "mintAddress": "string (base58 pubkey)",
+  "recipient": "string (base58 pubkey)",
+  "amount": "string (u64 raw units)"
 }
 ```
 
-**Response (200):**
+**Response Schema (200 OK):**
 ```json
 {
   "success": true,
-  "signature": "<base58 tx signature>",
+  "signature": "string (base58 tx sig)",
   "slot": 123456789,
   "amount": "1000000"
 }
-```
-
-**Error Response (400/500):**
-```json
-{
-  "success": false,
-  "error": "Error message"
-}
-```
-
-**Example:**
-```bash
-curl -X POST http://localhost:3001/mint \
-  -H 'Content-Type: application/json' \
-  -d '{"mintAddress": "<MINT_PUBKEY>", "recipient": "<RECIPIENT_PUBKEY>", "amount": "1000000"}'
 ```
 
 ### `POST /burn`
-Submit a burn request.
+Burn tokens from the burner's associated token account.
 
-**Request Body:**
+**Request Schema:**
 ```json
 {
-  "mintAddress": "public key",
-  "amount": "string (raw units)"
+  "mintAddress": "string (base58 pubkey)",
+  "amount": "string (u64 raw units)"
 }
 ```
 
-**Response (200):**
+**Response Schema (200 OK):**
 ```json
 {
   "success": true,
-  "signature": "<base58 tx signature>",
-  "slot": 123456789,
-  "amount": "1000000"
+  "signature": "string (base58 tx sig)"
 }
 ```
 
-**Example:**
-```bash
-curl -X POST http://localhost:3001/burn \
-  -H 'Content-Type: application/json' \
-  -d '{"mintAddress": "<MINT_PUBKEY>", "amount": "500000"}'
+---
+
+## 2. Webhook Service (Port 3002)
+
+Manages subscriptions and delivery of on-chain compliance and mint events.
+
+### `POST /subscriptions`
+Register a new webhook listener.
+
+**Request Schema:**
+```json
+{
+  "url": "string (https url)",
+  "events": ["array of strings (BLACKLIST_ADD, SEIZE, MINT)"],
+  "stablecoinId": "string (base58 mint address)"
+}
 ```
 
-### `GET /supply/:mint`
-Get on-chain and database supply data for a mint.
-
-**Response:**
+**Response Schema (201 Created):**
 ```json
 {
   "success": true,
   "data": {
-    "mint": "<MINT_PUBKEY>",
-    "totalMinted": "10000000",
-    "totalBurned": "3000000",
-    "currentSupply": "7000000"
+    "id": "string (uuid)",
+    "url": "string",
+    "secret": "string (HMAC secret - ONLY SHOWN ONCE)",
+    "events": ["..."],
+    "active": true
   }
 }
 ```
 
-**Example:**
-```bash
-curl http://localhost:3001/supply/<MINT_PUBKEY>
-```
+### `GET /deliveries/:id`
+Check the status of a specific event delivery.
 
-### `GET /quota/:minter?mint=<pubkey>`
-Get minter quota status.
-
-**Response:**
+**Response Schema (200 OK):**
 ```json
 {
-  "minter": "...",
-  "mint": "...",
-  "used": "3000000",
-  "period": "lifetime"
+  "success": true,
+  "data": {
+    "id": "string",
+    "status": "string (PENDING, DELIVERED, FAILED)",
+    "attempts": 1,
+    "lastAttempt": "ISO-8601 string",
+    "responseCode": 200
+  }
 }
 ```
-
-### `GET /health`
-Health check.
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "service": "mint-service",
-  "uptime": 123.456,
-  "version": "0.1.0",
-  "timestamp": "2026-01-01T00:00:00.000Z"
-}
-```
-
-## Indexer (Port 3002)
-
-### `GET /status`
-Get indexer status.
-
-**Response:**
-```json
-{
-  "isRunning": true,
-  "lastProcessedSlot": "123456789",
-  "currentSlot": 123456800,
-  "lag": 11,
-  "programId": "..."
-}
-```
-
-### `POST /reindex`
-Trigger reindex from a specific slot.
-
-**Request Body:**
-```json
-{ "fromSlot": 123456000 }
-```
-
-### `GET /health`
 
 ---
 
-## Compliance Service (Port 3003)
+## 3. Compliance Service (Port 3003)
 
-### `GET /blacklist/:mint`
-List all blacklist entries for a mint.
+Exposes audit trails and real-time verification for AML/KYC.
 
-**Response:**
+### `GET /blacklist/:mint/:target`
+Check if a specific wallet is currently blacklisted.
+
+**Response Schema (200 OK):**
 ```json
 {
-  "mint": "...",
-  "entries": [
-    { "target": "...", "reason": "OFAC", "addedAt": "...", "active": true }
+  "mint": "string (base58)",
+  "target": "string (base58)",
+  "blacklisted": true,
+  "entry": {
+    "reason": "string",
+    "addedAt": "ISO-8601 timestamp"
+  }
+}
+```
+
+### `GET /audit/:mint`
+Query the immutable history of all compliance actions.
+
+**Query Parameters:** 
+- `action` (optional): Filter by `SEIZE`, `BLACKLIST_ADD`, `FREEZE`.
+- `format` (optional): `json` or `csv`.
+
+**Response Schema (200 OK):**
+```json
+{
+  "mint": "string (base58)",
+  "events": [
+    {
+      "eventId": "uuid",
+      "timestamp": "ISO-8601",
+      "actionType": "SEIZE",
+      "operator": "string (val)",
+      "targetWallet": "string (val)",
+      "amountSeized": "1000000",
+      "txSignature": "string"
+    }
   ],
   "total": 1
 }
 ```
 
-### `GET /blacklist/:mint/:target`
-Check if a specific wallet is blacklisted.
-
-**Response:**
-```json
-{
-  "mint": "...",
-  "target": "...",
-  "blacklisted": true,
-  "entry": { "reason": "...", "addedAt": "..." }
-}
-```
-
-### `GET /events/:mint`
-Get compliance event history.
-
-**Query Parameters:** `page`, `limit`, `type`
-
-**Response:**
-```json
-{
-  "mint": "...",
-  "events": [],
-  "page": 1,
-  "limit": 50,
-  "total": 0
-}
-```
-
-### `GET /events/:mint/export`
-Export compliance events as CSV.
-
-**Response:** `text/csv`
-
-### `GET /health`
-
 ---
 
-## Webhook Service (Port 3004)
+## 4. Oracle Service (Port 3004)
 
-### `POST /subscriptions`
-Register a new webhook subscription.
+Manages external price feed integrations for SSS-gated mints.
 
-**Request Body:**
+### `GET /oracle/status/:mint`
+Check if a mint is currently pegged and eligible for minting operations.
+
+**Response Schema (200 OK):**
 ```json
 {
-  "url": "https://your.service/webhook",
-  "events": ["BLACKLIST_ADD", "SEIZE", "MINT"],
-  "stablecoinId": "..."
+  "mint": "string (base58)",
+  "feedAddress": "string (base58 Switchboard/Pyth account)",
+  "currentPrice": "1.0003",
+  "minPrice": "0.9950",
+  "maxPrice": "1.0050",
+  "isPegMaintained": true,
+  "stalenessSeconds": 12,
+  "maxStaleness": 60
 }
 ```
 
-**Response (201):**
+### `POST /oracle/update`
+Internal endpoint: trigger an on-chain config update for the oracle feed boundaries.
+
+**Request Schema:**
 ```json
 {
-  "success": true,
-  "data": {
-    "id": "cuid",
-    "url": "...",
-    "secret": "<hmac_secret — store securely, shown only once>",
-    "events": ["..."],
-    "active": true,
-    "createdAt": "2026-01-01T00:00:00.000Z"
-  },
-  "message": "Webhook registered. Store the secret securely — it won't be shown again."
+  "mint": "string",
+  "minPrice": "string (u64 scaled)",
+  "maxPrice": "string (u64 scaled)",
+  "maxStaleness": 60
 }
-```
-
-**Example:**
-```bash
-curl -X POST http://localhost:3004/subscriptions \
-  -H 'Content-Type: application/json' \
-  -d '{"url": "https://example.com/hook", "events": ["MINT", "BURN"]}'
-```
-
-### `GET /subscriptions`
-List all active webhook subscriptions.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [{"id": "...", "url": "...", "events": [...], "active": true}],
-  "total": 1
-}
-```
-
-### `DELETE /subscriptions/:id`
-Remove a webhook subscription.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": { "id": "...", "status": "deleted" }
-}
-```
-
-### `POST /deliver` (Internal)
-Enqueue a webhook delivery (called by the indexer).
-
-**Request Body:**
-```json
-{
-  "event": "MINT",
-  "mintAddress": "<pubkey>",
-  "payload": {}
-}
-```
-
-### `GET /deliveries/:id`
-Check delivery status.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "...",
-    "event": "MINT",
-    "status": "DELIVERED",
-    "attempts": 1,
-    "lastAttempt": "2026-01-01T00:00:00.000Z",
-    "response": "HTTP 200"
-  }
-}
-```
-
-### `GET /health`
-
----
-
-## Webhook Payload Format
-
-```json
-{
-  "id": "delivery-uuid",
-  "event": "BLACKLIST_ADD",
-  "timestamp": "2024-01-01T00:00:00Z",
-  "data": {
-    "mint": "...",
-    "target": "...",
-    "operator": "...",
-    "reason": "...",
-    "signature": "..."
-  }
-}
-```
-
-### Signature Verification
-
-Webhook payloads are signed with HMAC-SHA256:
-
-```
-X-SSS-Signature: sha256=<hex_digest>
-```
-
-Verify:
-```javascript
-const crypto = require("crypto");
-const expected = crypto.createHmac("sha256", secret).update(body).digest("hex");
-const valid = `sha256=${expected}` === request.headers["x-sss-signature"];
 ```

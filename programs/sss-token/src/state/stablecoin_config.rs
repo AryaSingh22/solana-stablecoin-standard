@@ -16,13 +16,15 @@ use crate::constants::*;
 //       + 1 (enable_permanent_delegate bool)
 //       + 1 (enable_transfer_hook bool)
 //       + 1 (default_account_frozen bool)
+//       + 1 (enable_confidential_transfers bool) -- SSS-3
+//       + 1 (enable_allowlist bool) -- SSS-3
 //       + 1 (paused bool)
 //       + 8 (total_minted u64)
 //       + 8 (total_burned u64)
 //       + 1 (bump u8)
-//       = 8 + 32 + 32 + 36 + 14 + 204 + 1 + 1 + 1 + 1 + 1 + 8 + 8 + 1 = 348
+//       = 350
 /// Size of the [`StablecoinConfig`] account in bytes, including the 8-byte discriminator.
-pub const STABLECOIN_CONFIG_SIZE: usize = 8 + 32 + 32 + (4 + MAX_NAME_LEN) + (4 + MAX_SYMBOL_LEN) + (4 + MAX_URI_LEN) + 1 + 1 + 1 + 1 + 1 + 8 + 8 + 1;
+pub const STABLECOIN_CONFIG_SIZE: usize = 8 + 32 + 32 + (4 + MAX_NAME_LEN) + (4 + MAX_SYMBOL_LEN) + (4 + MAX_URI_LEN) + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 8 + 8 + 1;
 
 /// Primary configuration account for a stablecoin deployed via the SSS program.
 ///
@@ -51,6 +53,10 @@ pub struct StablecoinConfig {
     pub enable_transfer_hook: bool,
     /// Whether new token accounts are frozen by default (immutable after init).
     pub default_account_frozen: bool,
+    /// Whether confidential transfers (SPL Token-2022 extension) are enabled (SSS-3, immutable after init).
+    pub enable_confidential_transfers: bool,
+    /// Whether allowlist-based access control is enabled (SSS-3, immutable after init).
+    pub enable_allowlist: bool,
     /// Whether token operations (mint, burn, transfer) are currently paused.
     pub paused: bool,
     /// Cumulative total of tokens minted since initialization.

@@ -43,6 +43,8 @@ export enum SSSPreset {
     SSS1 = "SSS-1",
     /** Enhanced compliance — adds blacklist, seize, transfer hook */
     SSS2 = "SSS-2",
+    /** Private stablecoin — confidential transfers + allowlist */
+    SSS3 = "SSS-3",
 }
 
 // ============================================================================
@@ -177,6 +179,10 @@ export interface InitializeArgs {
     defaultAccountFrozen: boolean;
     /** Transfer hook program ID (required if enableTransferHook=true). */
     hookProgramId?: PublicKey;
+    /** Enable confidential transfers (SSS-3). */
+    enableConfidentialTransfers?: boolean;
+    /** Enable allowlist-based access control (SSS-3). */
+    enableAllowlist?: boolean;
 }
 
 /**

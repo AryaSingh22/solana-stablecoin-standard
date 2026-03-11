@@ -1,81 +1,87 @@
-# SSS-1 Specification — Basic Stablecoin
+# SSS-1 Specification: Minimal Stablecoin Standard
 
-## Conformance Language
+## 1. Introduction
 
-The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **MAY**, and **OPTIONAL** in this document are to be interpreted as described in [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
+SSS-1 defines the baseline standard for a Solana stablecoin leveraging Token-2022. It is designed for issuers requiring strict role-based access control and quota-enforced minting, but without the mandatory use of complex transfer hooks or permanent delegates.
 
-## Normative Requirements
+## 2. Conformance Language
 
-- An SSS-1 implementation **MUST** create a `StablecoinConfig` PDA at seed `["stablecoin_config", mint]` upon initialization.
-- An SSS-1 implementation **MUST** create a `PauseState` PDA at seed `["pause_state", mint]` upon initialization.
-- The `pause` instruction **SHALL** block all `mint_tokens`, `burn_tokens`, and token transfer operations while `PauseState.paused` is `true`.
-- The `pause` instruction **MUST NOT** block `freeze_account`, `thaw_account`, `add_to_blacklist`, or `seize` operations.
-- The `mint_tokens` instruction **MUST** check and decrement the minter's quota before minting.
-- A minter's quota **SHALL** be enforced within the configured period (daily / weekly / monthly / unlimited).
-- The `freeze_account` instruction **MUST** require the operator to hold MasterAuthority or Blacklister role.
-- Extension flags (`enable_permanent_delegate`, `enable_transfer_hook`, `default_account_frozen`) **MUST NOT** be modifiable after initialization.
-- Every instruction with a role check **SHALL** return `SssError::NotAuthorized` when the signer does not hold the required role.
-- The `transfer_authority` instruction **MUST** atomically deactivate the old MasterAuthority role and create the new one in a single transaction.
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in RFC 2119.
 
-## Overview
+## 3. Token-2022 Extension Requirements
 
-SSS-1 is the foundational tier providing core stablecoin functionality:
-mint, burn, freeze, pause, and role-based access control.
+An SSS-1 compliant token:
+- **MUST** be initialized as a Token-2022 Mint.
+- **MUST NOT** initialize the `TransferHook` extension.
+- **MUST NOT** initialize the `PermanentDelegate` extension.
+- **MUST NOT** initialize the `DefaultAccountState` extension as `Frozen`.
+- **MAY** initialize the `MetadataPointer` extension to point to self.
+- **MAY** initialize the `TokenMetadata` extension.
 
-**No Token-2022 extensions are enabled** — SSS-1 uses a standard Token-2022 mint without PermanentDelegate, TransferHook, or DefaultAccountState.
+## 4. Account Schemas
 
-## Features
+All PDAs **MUST** be derived from the Mint address to ensure deterministic discovery.
 
-| Feature | Supported | Description |
-|---------|-----------|-------------|
-| Mint | ✅ | Quota-enforced minting |
-| Burn | ✅ | Burner-role holders can burn from own account |
-| Freeze/Thaw | ✅ | Operator can freeze individual accounts |
-| Pause/Unpause | ✅ | Global pause of all operations |
-| Roles | ✅ | 5 roles: Master, Minter, Burner, Pauser, Blacklister |
-| Blacklist | ❌ | SSS-2 only |
-| Seize | ❌ | SSS-2 only |
-| Transfer Hook | ❌ | SSS-2 only |
+### 4.1 `StablecoinConfig` (PDA: `["config", MINT]`)
+| Offset | Name | Type | Size (Bytes) | Description |
+|--------|------|------|--------------|-------------|
+| 0 | `discriminator` | `[u8; 8]` | 8 | Anchor discriminator |
+| 8 | `authority` | `Pubkey` | 32 | Global program authority |
+| 40 | `mint` | `Pubkey` | 32 | Token-2022 Mint address |
+| 72 | `name` | `[u8; 32]` | 32 | Null-padded string |
+| 104| `symbol` | `[u8; 8]` | 8 | Null-padded string |
+| 112| `decimals` | `u8` | 1 | Token decimals (0-9) |
+| 113| `enable_transfer_hook`| `bool` | 1 | **MUST** be `false` in SSS-1 |
+| 114| `enable_permanent_delegate`| `bool` | 1 | **MUST** be `false` in SSS-1 |
+| 115| `default_account_frozen`| `bool` | 1 | **MUST** be `false` in SSS-1 |
+| 116| `total_minted`| `u64` | 8 | Cumulative minted amount |
+| 124| `total_burned`| `u64` | 8 | Cumulative burned amount |
+| 132| `bump` | `u8` | 1 | PDA bump |
+**Total Size:** 133 Bytes
 
-## Initialization
+### 4.2 `PauseState` (PDA: `["pause_state", MINT]`)
+| Offset | Name | Type | Size (Bytes) | Description |
+|--------|------|------|--------------|-------------|
+| 0 | `discriminator` | `[u8; 8]` | 8 | Anchor discriminator |
+| 8 | `authority` | `Pubkey` | 32 | Last Pauser authority |
+| 40 | `is_paused` | `bool` | 1 | `true` if transfers/mints halted |
+| 41 | `timestamp` | `i64` | 8 | Unix timestamp of state change |
+**Total Size:** 49 Bytes
 
-```typescript
-import { sss1Preset } from "@stbr/sss-token";
+### 4.3 `RoleRecord` (PDA: `["role", MINT, WALLET, ROLE_TYPE_U8]`)
+| Offset | Name | Type | Size (Bytes) | Description |
+|--------|------|------|--------------|-------------|
+| 0 | `discriminator` | `[u8; 8]` | 8 | Anchor discriminator |
+| 8 | `authority` | `Pubkey` | 32 | Wallet holding the role |
+| 40 | `role_type` | `u8` | 1 | 0=Master, 1=Minter, 2=Burner, 3=Pauser, 4=Blacklister, 5=Seizer |
+| 41 | `active` | `bool` | 1 | `true` if role is currently valid |
+| 42 | `granted_at` | `i64` | 8 | Unix timestamp |
+| 50 | `granted_by` | `Pubkey` | 32 | Master authority that granted |
+| 82 | `bump` | `u8` | 1 | PDA bump |
+**Total Size:** 83 Bytes
 
-const args = sss1Preset("USD Stablecoin", "USDS", "https://meta.example.com", 6);
-// Result:
-// {
-//   name: "USD Stablecoin",
-//   symbol: "USDS",
-//   uri: "https://meta.example.com",
-//   decimals: 6,
-//   enablePermanentDelegate: false,
-//   enableTransferHook: false,
-//   defaultAccountFrozen: false,
-// }
-```
+## 5. Instruction Specification
 
-## Workflow
+### 5.1 `initialize`
+- **MUST** create the `StablecoinConfig` and `PauseState` accounts.
+- **MUST** assign the `MasterAuthority` role to the payer/authority.
+- **MUST** set the mint authority and freeze authority of the Token-2022 mint to the `StablecoinConfig` PDA.
 
-### 1. Initialize
-Authority creates the stablecoin → becomes MasterAuthority.
+### 5.2 `mint_tokens`
+- **MUST** verify the signer holds an active `Minter` role.
+- **MUST** verify `PauseState.is_paused == false`.
+- **MUST** fetch the `MinterQuota` PDA for the signer.
+- **MUST** enforce the quota limit (`current_minted + amount <= limit`).
+- **MUST** emit a `MintEvent`.
 
-### 2. Configure Roles
-MasterAuthority grants Minter, Burner, Pauser roles to operators.
+### 5.3 `burn_tokens`
+- **MUST** verify the signer holds an active `Burner` role.
+- **MUST** verify the signer is burning from an ATA they own.
+- **MUST** emit a `BurnEvent`.
 
-### 3. Set Quotas
-MasterAuthority sets per-minter quotas (daily/weekly/monthly/unlimited).
-
-### 4. Operate
-- Minters mint tokens (quota-enforced)
-- Burners burn tokens
-- Pausers can pause/unpause in emergencies
-
-## On-Chain Accounts Created
-
-| Account | Size | Rent |
-|---------|------|------|
-| StablecoinConfig | ~300 bytes | ~0.003 SOL |
-| PauseState | ~80 bytes | ~0.001 SOL |
-| RoleRecord (per role) | ~120 bytes | ~0.002 SOL |
-| MinterQuota (per minter) | ~100 bytes | ~0.001 SOL |
+## 6. Known Exclusions
+SSS-1 **DOES NOT** include:
+1. `add_to_blacklist`
+2. `remove_from_blacklist`
+3. `seize`
+*(These require SSS-2 extensions).*

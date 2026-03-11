@@ -1,112 +1,72 @@
-# SSS-2 Specification — Enhanced Compliance
+# SSS-2 Specification: Enhanced Compliance Standard
 
-## Conformance Language
+## 1. Introduction
 
-The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **MAY**, and **OPTIONAL** in this document are to be interpreted as described in [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
+SSS-2 extends SSS-1 by mandating Token-2022 extensions required for enterprise compliance: Permanent Delegate, Transfer Hook, and Default Account State. It enforces real-time transfer blocking and enables asset seizure from blacklisted accounts.
 
-## Normative Requirements
+## 2. Conformance Language
 
-- An SSS-2 implementation **MUST** enable the `PermanentDelegate`, `TransferHook`, and `DefaultAccountState` Token-2022 extensions at initialization.
-- The `enable_permanent_delegate`, `enable_transfer_hook`, and `default_account_frozen` extension flags **MUST NOT** be changeable after initialization.
-- The `add_to_blacklist` instruction **SHALL** be feature-gated: it **MUST** require `config.enable_transfer_hook == true`, returning `SssError::FeatureNotEnabled` otherwise.
-- The `add_to_blacklist` instruction **MUST** atomically create a `BlacklistEntry` PDA and freeze the target's token account in the same transaction.
-- A `BlacklistEntry` record **SHALL NOT** be deleted; it **MUST** be deactivated by setting `active = false` to preserve the audit trail.
-- The `seize` instruction **MUST** require both `config.enable_permanent_delegate == true` and `blacklist_entry.active == true` before transferring tokens.
-- The transfer hook `execute` handler **MUST** reject any transfer where the source or destination has an active `BlacklistEntry`.
-- The transfer hook `execute` handler **MUST** reject any transfer while `PauseState.paused == true`.
-- The `BlacklistEntry.reason` field **SHALL** be stored as a UTF-8 `String` and **MUST NOT** exceed 100 bytes.
-- All compliance events (blacklist, seize, pause) **MUST** emit on-chain events with operator, timestamp, and target fields.
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in RFC 2119.
 
-## Overview
+## 3. Token-2022 Extension Requirements
 
-SSS-2 extends SSS-1 with enterprise compliance features using three Token-2022 extensions:
+An SSS-2 compliant token:
+- **MUST** be initialized as a Token-2022 Mint.
+- **MUST** initialize the `TransferHook` extension pointing to a strictly validating hook program.
+- **MUST** initialize the `PermanentDelegate` extension pointing to the `StablecoinConfig` PDA.
+- **MUST** initialize the `DefaultAccountState` extension as `Frozen` or `Initialized` depending on business requirements (usually `Frozen` for strict KYC gating).
+- **MUST NOT** allow modifying `enable_transfer_hook`, `enable_permanent_delegate`, or `default_account_frozen` after initialization.
 
-| Extension | Purpose |
-|-----------|---------|
-| **PermanentDelegate** | Enables asset seizure from any account |
-| **TransferHook** | Real-time compliance enforcement on every transfer |
-| **DefaultAccountState** | New accounts are frozen until explicitly approved |
+## 4. Account Schemas
 
-## Features
+SSS-2 inherits all accounts from SSS-1 and adds the following:
 
-| Feature | Description |
-|---------|-------------|
-| Blacklist | Add/remove wallets from compliance blacklist |
-| Transfer Blocking | TransferHook blocks transfers involving blacklisted wallets or during pause |
-| Asset Seizure | Seizer role can move tokens from frozen, blacklisted accounts to treasury |
-| Default Frozen | New token accounts start frozen; must be thawed before use |
-| Full Audit Trail | All compliance events recorded with operator, reason, timestamp |
+### 4.1 `BlacklistEntry` (PDA: `["blacklist", MINT, WALLET_AUTHORITY]`)
+| Offset | Name | Type | Size (Bytes) | Description |
+|--------|------|------|--------------|-------------|
+| 0 | `discriminator` | `[u8; 8]` | 8 | Anchor discriminator |
+| 8 | `authority` | `Pubkey` | 32 | Wallet owner being blacklisted |
+| 40 | `active` | `bool` | 1 | `true` if blacklist is enforced |
+| 41 | `timestamp` | `i64` | 8 | Unix timestamp of addition |
+| 49 | `operator` | `Pubkey` | 32 | Blacklister who added entry |
+| 81 | `reason` | `String` | ≤104| UTF-8 string (4 bytes len + 100 bytes max payload) |
+| 185| `bump` | `u8` | 1 | PDA bump |
+**Max Total Size:** 186 Bytes
 
-## Initialization
+### 4.2 `ExtraAccountMetaList` (Transfer Hook PDA: `["extra-account-metas", MINT]`)
+Required by the `spl-transfer-hook-interface` to resolve accounts during transfer.
+- **MUST** include index mapping for:
+  - `sss-token` program ID
+  - `PauseState` PDA
+  - `BlacklistEntry` PDA (Source Wallet)
+  - `BlacklistEntry` PDA (Destination Wallet)
 
-```typescript
-import { sss2Preset } from "@stbr/sss-token";
+## 5. Instruction Specification
 
-const args = sss2Preset(
-  "Regulated USD",
-  "RUSD",
-  "https://regulated.example.com",
-  hookProgramId,  // Transfer hook program ID
-  6,
-);
-// Extensions: PermanentDelegate=true, TransferHook=true, DefaultFrozen=true
-```
+### 5.1 `add_to_blacklist`
+- **MUST** verify the signer holds an active `Blacklister` role.
+- **MUST** verify `config.enable_transfer_hook == true`.
+- **MUST** create or update the `BlacklistEntry` PDA with `active = true`.
+- **MUST** execute a Token-2022 `freeze_account` CPI against the target's associated token account.
+- **MUST** emit a `BlacklistEvent`.
 
-## Compliance Workflow
+### 5.2 `remove_from_blacklist`
+- **MUST** verify the signer holds an active `Blacklister` role.
+- **MUST** set `BlacklistEntry.active = false`.
+- **MUST NOT** delete the account (to preserve the audit trail).
+- **MUST NOT** automatically thaw the token account (operators **MUST** call `thaw_account` separately).
 
-### Blacklisting
+### 5.3 `seize`
+- **MUST** verify the signer holds an active `Seizer` role.
+- **MUST** verify `config.enable_permanent_delegate == true`.
+- **MUST** verify `BlacklistEntry.active == true` for the target wallet.
+- **MUST** execute a Token-2022 `transfer_checked` or `burn`/`mint` sequence using the `PermanentDelegate` authority (the `StablecoinConfig` PDA) to move funds to the destination treasury.
+- **MUST** emit a `SeizeEvent`.
 
-```
-Blacklister → addToBlacklist(target, reason)
-    1. Creates BlacklistEntry PDA (with reason, timestamp, operator)
-    2. Freezes target's token account
-    3. TransferHook now blocks all transfers involving target
-```
+## 6. Transfer Hook Execution
 
-### Asset Seizure
-
-```
-Seizer → seize(sourceTokenAccount, treasuryTokenAccount)
-    Prerequisites: target must be blacklisted AND frozen
-    1. Validates Seizer role + BlacklistEntry
-    2. Uses PermanentDelegate to transfer tokens without owner signature
-    3. Moves all tokens to treasury
-```
-
-### Un-blacklisting
-
-```
-Blacklister → removeFromBlacklist(target)
-    1. Sets BlacklistEntry.active = false (record preserved for audit)
-    2. Does NOT auto-thaw — explicit thawAccount() call required
-```
-
-## Transfer Hook Enforcement
-
-Every Token-2022 transfer triggers the hook:
-
-```
-Execute handler:
-  1. Load PauseState PDA → reject if paused
-  2. Load BlacklistEntry for source → reject if active
-  3. Load BlacklistEntry for destination → reject if active
-  4. Allow transfer
-```
-
-## Role Matrix (SSS-2)
-
-| Role | Standard Ops | Blacklist | Seize |
-|------|-------------|-----------|-------|
-| MasterAuthority | ✅ | — | — |
-| Minter | mint | — | — |
-| Burner | burn | — | — |
-| Pauser | pause/unpause | — | — |
-| Blacklister | freeze/thaw | ✅ add/remove | — |
-| Seizer | — | — | ✅ seize |
-
-## Additional On-Chain Accounts
-
-| Account | Size | Rent |
-|---------|------|------|
-| BlacklistEntry (per target) | ~320 bytes | ~0.004 SOL |
-| ExtraAccountMetaList (per mint) | ~200 bytes | ~0.002 SOL |
+The `transfer-hook` program's `execute` instruction:
+1. **MUST** load the `PauseState` PDA. If `is_paused == true`, the transfer **MUST** abort with a `TokenPaused` error.
+2. **MUST** load the `BlacklistEntry` for the **source** wallet. The wallet address **MUST** be resolved from bytes 32..64 of the source Token Account data. If `active == true`, the transfer **MUST** abort with a `WalletBlacklisted` error.
+3. **MUST** load the `BlacklistEntry` for the **destination** wallet. The wallet address **MUST** be resolved from bytes 32..64 of the destination Token Account data. If `active == true`, the transfer **MUST** abort with a `WalletBlacklisted` error.
+4. **MUST** return `Ok(())` if all checks pass.

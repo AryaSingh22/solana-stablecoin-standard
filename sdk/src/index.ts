@@ -76,6 +76,7 @@ export {
 // Presets — spec-required Presets namespace (HIGH-005)
 import { SSS1_FEATURES } from "./presets/sss1";
 import { SSS2_FEATURES } from "./presets/sss2";
+import { SSS3_FEATURES } from "./presets/sss3";
 
 /**
  * SSS preset configurations.
@@ -94,11 +95,14 @@ export const Presets = {
     SSS_1: SSS1_FEATURES,
     /** SSS-2: Compliance stablecoin — with permanent delegate + transfer hook. */
     SSS_2: SSS2_FEATURES,
+    /** SSS-3: Private stablecoin — confidential transfers + allowlist. */
+    SSS_3: SSS3_FEATURES,
 } as const;
 
 // Preset factory functions (kept for backward compat)
 export { sss1Preset, SSS1_FEATURES } from "./presets/sss1";
 export { sss2Preset, SSS2_FEATURES } from "./presets/sss2";
+export { sss3Preset, SSS3_FEATURES } from "./presets/sss3";
 
 // PDA helpers
 export {

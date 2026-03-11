@@ -7,16 +7,18 @@ skip-lint = false
 [programs.localnet]
 sss_token = "HLvhfKVfGfKXVNS9tZ1q7SNS4w9mQmcjre758QFhbZDZ"
 transfer_hook = "2wcwbEsw7rZ2t36qaDujHUc9HHrg3f5m4opcSHpixNUv"
+oracle_module = "HEuTBAakSu9sojbzjbcgBzsFkRYeRaZJdixqcao5Gvo6"
 
 [programs.devnet]
 sss_token = "HLvhfKVfGfKXVNS9tZ1q7SNS4w9mQmcjre758QFhbZDZ"
 transfer_hook = "2wcwbEsw7rZ2t36qaDujHUc9HHrg3f5m4opcSHpixNUv"
+oracle_module = "HEuTBAakSu9sojbzjbcgBzsFkRYeRaZJdixqcao5Gvo6"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "Devnet"
 wallet = "~/.config/solana/id.json"
 
 [test]

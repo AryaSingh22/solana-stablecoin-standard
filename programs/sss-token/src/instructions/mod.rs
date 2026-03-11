@@ -8,6 +8,8 @@ pub mod pause;
 pub mod roles;
 pub mod compliance;
 pub mod seize;
+pub mod allowlist;
+pub mod confidential;
 
 pub use initialize::*;
 pub use mint::*;
@@ -17,5 +19,5 @@ pub use pause::*;
 pub use roles::*;
 pub use compliance::*;
 pub use seize::*;
-
-
+pub use allowlist::*;
+pub use confidential::*;

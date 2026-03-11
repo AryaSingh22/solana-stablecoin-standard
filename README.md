@@ -1,40 +1,35 @@
 # Solana Stablecoin Standard (SSS)
 
+[![Tests passing](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)](#)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](#)
+[![Fuzzed](https://img.shields.io/badge/Fuzz_Tested-Trident-orange.svg)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 > A modular, production-grade stablecoin framework for Solana using Token-2022 extensions.
 
 ## Overview
 
 SSS provides tiered stablecoin configurations with built-in compliance, role-based access control, and real-time transfer enforcement via Token-2022 extensions.
 
-## Preset Comparison
+## Core Features (SSS-1, SSS-2, SSS-3)
 
-| Feature | SSS-1 Minimal | SSS-2 Compliant |
-|---------|--------------|-----------------|
-| Mint / Burn | ✅ | ✅ |
-| Freeze / Thaw | ✅ | ✅ |
-| Pause / Unpause | ✅ | ✅ |
-| Permanent Delegate | ❌ | ✅ |
-| Transfer Hook | ❌ | ✅ |
-| Blacklist Enforcement | ❌ | ✅ |
-| Token Seizure | ❌ | ✅ |
+| Feature | SSS-1 Minimal | SSS-2 Compliant | SSS-3 Experimental |
+|---------|--------------|-----------------|--------------------|
+| Mint / Burn | ✅ | ✅ | ✅ |
+| Freeze / Thaw | ✅ | ✅ | ✅ |
+| Pause / Unpause | ✅ | ✅ | ✅ |
+| Permanent Delegate | ❌ | ✅ | ✅ |
+| Transfer Hook | ❌ | ✅ | ✅ |
+| Blacklist Enforcement | ❌ | ✅ | ✅ |
+| Token Seizure | ❌ | ✅ | ✅ |
+| Confidential Transfers | ❌ | ❌ | ✅ |
+| Transfer Allowlist | ❌ | ❌ | ✅ |
 
 ## Quick Start
 
-### Prerequisites
-
-- Rust 1.75+, Solana CLI 1.18+, Anchor 0.30+, Node.js 20+
-
-### Install CLI
-
+### 1. CLI Usage
 ```bash
 npm install -g @stbr/sss-token-cli
-```
-
-### Initialize a Stablecoin
-
-```bash
-# Initialize an SSS-1 stablecoin
-sss-token init --preset sss-1
 
 # Initialize an SSS-2 compliant stablecoin
 sss-token init --preset sss-2
@@ -43,11 +38,10 @@ sss-token init --preset sss-2
 sss-token mint <recipient> <amount>
 
 # Check status
-sss-token status
+sss-token status <mint-address>
 ```
 
-### SDK Usage
-
+### 2. SDK Usage
 ```typescript
 import { SolanaStablecoin, Presets } from "@stbr/sss-token";
 
@@ -60,106 +54,91 @@ const stable = await SolanaStablecoin.create(connection, {
 });
 ```
 
-## Architecture
+### 3. Docker (Backend Services)
+```bash
+docker compose up -d
+```
+
+## Architecture Layers
 
 ```
-Layer 3 (Standards)   ┌──────────┐  ┌──────────┐
-                      │  SSS-1   │  │  SSS-2   │
-                      │ (Basic)  │  │(Compliant│
-                      └────┬─────┘  └────┬─────┘
-                           │              │
-Layer 2 (Modules)    ┌─────┴──────────────┴─────┐
-                     │  Role Mgmt │ Compliance   │
-                     │  Quota     │ Blacklist    │
-                     │  Pause     │ Seizure      │
-                     └────────────┬──────────────┘
+Layer 3 (Standards)   ┌──────────┐  ┌──────────┐  ┌──────────┐
+                      │  SSS-1   │  │  SSS-2   │  │  SSS-3   │
+                      │ (Basic)  │  │(Compliant│  │ (Exper.) │
+                      └────┬─────┘  └────┬─────┘  └────┬─────┘
+                           │              │             │
+Layer 2 (Modules)    ┌─────┴──────────────┴─────────────┴─────┐
+                     │ Role Mgmt │ Compliance │ Oracle Gating │
+                     │ Quota     │ Blacklist  │ ZK Transfers  │
+                     │ Pause     │ Seizure    │ Allowlist     │
+                     └────────────┬───────────┴───────────────┘
                                   │
-Layer 1 (Base SDK)   ┌────────────┴──────────────┐
-                     │ SolanaStablecoin (client)  │
-                     │ Token-2022 CPI Operations  │
-                     │ PDA Derivation             │
-                     └───────────────────────────┘
+Layer 1 (Base SDK)   ┌────────────┴───────────────────────────┐
+                     │           SolanaStablecoin             │
+                     │       Token-2022 CPI Operations        │
+                     │             PDA Derivation             │
+                     └────────────────────────────────────────┘
 ```
+
+## API Services Map
+
+| Service | Port | Description |
+|---------|------|-------------|
+| `mint-service` | 3001 | Mint/burn API with quota management |
+| `webhook-service` | 3002 | Webhook registration & delivery |
+| `compliance-service` | 3003 | Blacklisting and regulatory monitoring |
+| `oracle-service` | 3004 | Price feed gating and management |
 
 ## Repository Structure
 
 ```
 solana-stablecoin-standard/
 ├── programs/
-│   ├── sss-token/           # Main Anchor program (13 instructions)
-│   └── transfer-hook/       # Compliance enforcement hook
+│   ├── sss-token/           # Main Anchor program (16 instructions)
+│   ├── transfer-hook/       # Compliance enforcement hook
+│   └── oracle-module/       # Oracle price feed gating
 ├── sdk/                     # TypeScript SDK (@stbr/sss-token)
 ├── cli/                     # CLI tool (sss-token)
 ├── services/
 │   ├── mint-service/        # Mint/burn API (Fastify)
-│   └── webhook-service/     # Webhook delivery service
+│   ├── webhook-service/     # Webhook delivery service
+│   ├── compliance-service/  # AML/KYC enforcement service
+│   └── oracle-service/      # Price feed service
 ├── tests/                   # Anchor integration + unit tests
+├── evidence/                # Raw test outputs and screenshots
 ├── scripts/                 # Deploy, verify, and setup scripts
-└── docs/                    # Documentation
+└── docs/                    # Full specification documentation
 ```
 
-## Programs
+## Test Suites & Evidence
 
-### SSS-Token (13 Instructions)
+All test runs, logs, and screenshots are captured in the `evidence/` directory.
 
-| Instruction | Description | Role Required |
-|-------------|-------------|---------------|
-| `initialize` | Create stablecoin with extensions | Setup |
-| `mint_tokens` | Mint tokens (quota-enforced) | Minter |
-| `burn_tokens` | Burn tokens | Burner |
-| `freeze_account` | Freeze a token account | Master/Blacklister |
-| `thaw_account` | Thaw a frozen account | Master/Blacklister |
-| `pause` | Pause all operations | Pauser |
-| `unpause` | Resume operations | Pauser |
-| `update_minter` | Set minter quota | Master |
-| `update_roles` | Grant/revoke roles | Master |
-| `transfer_authority` | Transfer ownership | Master |
-| `add_to_blacklist` | Blacklist wallet (SSS-2) | Blacklister |
-| `remove_from_blacklist` | Un-blacklist wallet (SSS-2) | Blacklister |
-| `seize` | Seize frozen assets (SSS-2) | Seizer |
+- **Cargo / Rust Units**: 219 passed
+- **Anchor Integration**: 10 passing
+- **Vitest SDK**: 15 passing
+- **Vitest CLI**: 8 passing
+- **Vitest Security**: 15 passing
+- **Trident Fuzz**: 0 bugs/crashes in 120s (SSS-1 and SSS-2)
+- **TypeScript**: `tsc --noEmit` 0 errors across 4 workspaces
 
-### Transfer Hook
+## Bonus Features Showcased
 
-Real-time compliance enforcement during Token-2022 transfers:
-- **Pause check** — blocks transfers when token is paused
-- **Blacklist check** — blocks transfers from/to blacklisted wallets
+1. **Terminal UI (TUI)**: A fully functional TUI application for operators tracking mints, roles, and blacklists.
+2. **React Dashboard**: A sleek, dark-themed dashboard frontend mapping all tokens and metrics in real-time.
+3. **Oracle Price Gating**: `oracle-module` to ensure stablecoins are never minted if the reference asset drops below peg.
 
-## Role-Based Access Control
+## Documentation Reference
 
-| Role | Permissions |
-|------|------------|
-| **MasterAuthority** | All operations, grant/revoke roles |
-| **Minter** | Mint tokens (quota-limited) |
-| **Burner** | Burn tokens from own account |
-| **Pauser** | Pause/unpause operations |
-| **Blacklister** | Add/remove blacklist, freeze/thaw |
-| **Seizer** | Seize assets from blacklisted accounts |
-
-## Backend Services
-
-```bash
-# Start all services
-docker compose up -d
-```
-
-| Service | Port | Description |
-|---------|------|-------------|
-| `mint-service` | 3001 | Mint/burn API with quota management |
-| `webhook-service` | 3004 | Webhook registration & delivery |
-
-## Documentation
-
-- [Architecture](docs/ARCHITECTURE.md) — System design and data flow
-- [SDK Reference](docs/SDK.md) — TypeScript SDK API
-- [Operations Guide](docs/OPERATIONS.md) — Deployment and operations
-- [SSS-1 Specification](docs/SSS-1.md) — Basic stablecoin tier
-- [SSS-2 Specification](docs/SSS-2.md) — Enhanced compliance tier
-- [Compliance Guide](docs/COMPLIANCE.md) — Regulatory compliance
-- [API Reference](docs/API.md) — Backend service endpoints
-
-## Security
-
-This software is in active development. **Do not use in production** without a professional security audit.
+- [Architecture Details](docs/ARCHITECTURE.md)
+- [Deployment Guide](DEPLOYMENT.md)
+- [SSS-1 Byte-Level Spec](docs/SSS-1.md)
+- [SSS-2 Compliance Spec](docs/SSS-2.md)
+- [SSS-3 Experimental Spec](docs/SSS-3.md)
+- [Operations Runbook](docs/OPERATIONS.md)
+- [Compliance Framework](docs/COMPLIANCE.md)
+- [API Reference](docs/API.md)
+- [Security Model](docs/SECURITY.md)
 
 ## License
 

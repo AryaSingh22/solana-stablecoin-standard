@@ -18,6 +18,9 @@ pub const SEED_BLACKLIST: &[u8] = b"blacklist";
 /// PDA seed for pause state.
 pub const SEED_PAUSE: &[u8] = b"pause_state";
 
+/// PDA seed prefix for allowlist entries (SSS-3).
+pub const SEED_ALLOWLIST: &[u8] = b"allowlist";
+
 /// Maximum length for token name field.
 pub const MAX_NAME_LEN: usize = 32;
 

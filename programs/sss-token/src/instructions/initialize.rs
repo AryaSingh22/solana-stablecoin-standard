@@ -36,6 +36,10 @@ pub struct InitializeArgs {
     pub default_account_frozen: bool,
     /// The transfer hook program ID (required if enable_transfer_hook is true).
     pub hook_program_id: Option<Pubkey>,
+    /// Whether to enable confidential transfers (SSS-3).
+    pub enable_confidential_transfers: bool,
+    /// Whether to enable allowlist-based access control (SSS-3).
+    pub enable_allowlist: bool,
 }
 
 /// Accounts required for the initialize instruction.
@@ -213,6 +217,8 @@ pub fn initialize_handler(ctx: Context<Initialize>, args: InitializeArgs) -> Res
     config.enable_permanent_delegate = args.enable_permanent_delegate;
     config.enable_transfer_hook = args.enable_transfer_hook;
     config.default_account_frozen = args.default_account_frozen;
+    config.enable_confidential_transfers = args.enable_confidential_transfers;
+    config.enable_allowlist = args.enable_allowlist;
     config.paused = false;
     config.total_minted = 0;
     config.total_burned = 0;

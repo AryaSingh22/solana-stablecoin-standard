@@ -1,103 +1,69 @@
 > **LEGAL DISCLAIMER**
 >
 > This document and all referenced materials are provided for **informational and technical purposes only**. Nothing contained herein constitutes legal advice, regulatory guidance, or a legal opinion of any kind. The Solana Stablecoin Standard (SSS) is a technical framework; compliance with applicable laws—including but not limited to anti-money laundering (AML), know-your-customer (KYC), sanctions screening (OFAC), and securities regulations—is the **sole responsibility of the deploying entity**.
->
-> The authors and contributors of SSS expressly disclaim all liability arising from the use, deployment, or reliance on this software in regulated financial contexts. **Consult qualified legal counsel before deploying any stablecoin in a regulated jurisdiction.**
 
 # Compliance Guide
 
+## Regulatory Context
 
-## Overview
+SSS-2 is engineered specifically for institutional stablecoin issuers operating within regulated jurisdictions. It provides technical primitives to satisfy regulatory obligations:
 
-The SSS compliance framework provides regulatory enforcement capabilities at three levels:
+- **KYC/AML Enforcement:** via Transfer Hook blocking unverified or sanctioned counter-parties.
+- **Law Enforcement Requests:** via Permanent Delegate asset seizure.
+- **Reporting & Auditing:** via immutable on-chain state logging.
 
-1. **On-chain** — Immutable rules enforced by program logic and Transfer Hook
-2. **Backend** — Event indexing, audit trail, and webhook notifications
-3. **CLI/SDK** — Operator tools for compliance management
+## Blacklist & Seizure Enforcement Rules
 
-## Compliance Operations
+SSS-2 enforces strict technical state requirements to execute compliance actions:
 
-### Blacklist Management
+1. **Blacklisting (`add_to_blacklist`):**
+   - **MUST** target the wallet authority explicitly, not the token account.
+   - **MUST** record a UTF-8 reason string (max 100 bytes).
+   - **MUST** automatically freeze the specific token account immediately.
+2. **Seizure (`seize`):**
+   - Target wallet **MUST** possess an `active = true` BlacklistEntry PDA.
+   - Target token account **MUST** be in a `Frozen` state.
+   - If either condition is false, the Seizer role **CANNOT** move the assets.
+3. **Un-blacklisting (`remove_from_blacklist`):**
+   - **MUST NOT** delete the BlacklistEntry PDA. Sets `active = false`.
+   - **MUST NOT** automatically thaw the account. A `thaw_account` instruction must be issued separately to prevent race conditions.
 
-```bash
-# Add to blacklist (freezes account automatically)
-sss-token blacklist --mint <pk> --target <wallet> --reason "OFAC SDN list"
+## Audit Trail Format
 
-# Check blacklist status
-curl http://localhost:3003/blacklist/<mint>/<wallet>
+All compliance actions emit both explicit on-chain Anchor events and database states queryable via the Compliance Service API.
 
-# Remove from blacklist (does NOT auto-thaw)
-sss-token unblacklist --mint <pk> --target <wallet>
+| Field | Type | Description | Example |
+|-------|------|-------------|---------|
+| `event_id` | UUID | Unique identifier | `123e4567-e89b-12d3-a456-426614174000` |
+| `timestamp` | ISO-8601 | Time of action | `2026-03-11T12:00:00Z` |
+| `action_type` | Enum | Type of compliance action | `BLACKLIST_ADD`, `SEIZE`, `PAUSE` |
+| `operator` | Pubkey | Wallet that executed the action | `7Kx...9pZ` |
+| `target_wallet` | Pubkey | Wallet affected by the action | `4Xy...3bA` |
+| `amount_seized` | u64 | Required if action is `SEIZE` | `500000000` (500.00 USDC) |
+| `reason_code` | String | Regulatory/internal justification | `OFAC_SDN_MATCH_REQ_112` |
+| `tx_signature` | String | Solana Transaction ID | `5Kbc...39pL` |
 
-# Explicitly thaw after removal
-sss-token thaw --mint <pk> --target <token-account>
-```
+## Exporting Logs & Integration
 
-### Asset Seizure
+Compliance logs should be integrated directly into the issuer's primary AML/KYC vendor dashboards. 
 
-```bash
-# Pre-requisites: target must be blacklisted AND frozen
-sss-token seize --mint <pk> --source-account <token-account> --treasury <treasury-account>
-```
+### Webhook Integration
 
-### Pause (Emergency)
-
-```bash
-# Immediately halt ALL token operations
-sss-token pause --mint <pk>
-
-# Resume operations
-sss-token unpause --mint <pk>
-```
-
-## Audit Trail
-
-All compliance events are immutable:
-- **On-chain**: BlacklistEntry PDAs use active flag (never deleted)
-- **Database**: ComplianceEvent rows with operator, reason, timestamp
-- **CLI**: `~/.sss-token/audit.log` records all operations
-
-### Querying Events
+Register a webhook to have real-time events pushed to your AML platform:
 
 ```bash
-# All compliance events
-curl http://localhost:3003/events/<mint>
-
-# Filter by type
-curl http://localhost:3003/events/<mint>?type=BLACKLIST_ADD
-
-# Export CSV for regulators
-curl http://localhost:3003/events/<mint>/export > compliance-report.csv
-```
-
-## Compliance Event Types
-
-| Type | Description |
-|------|-------------|
-| `BLACKLIST_ADD` | Wallet added to blacklist |
-| `BLACKLIST_REMOVE` | Wallet removed from blacklist |
-| `FREEZE` | Token account frozen |
-| `THAW` | Token account thawed |
-| `SEIZE` | Assets seized from blacklisted account |
-| `PAUSE` | Token operations paused |
-| `UNPAUSE` | Token operations resumed |
-
-## Webhook Notifications
-
-Register webhooks to receive real-time compliance notifications:
-
-```bash
-# Register webhook
-curl -X POST http://localhost:3004/webhooks \
+curl -X POST http://localhost:3002/webhooks \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://your.service/webhook", "events": ["BLACKLIST_ADD", "SEIZE"]}'
-
-# Response includes HMAC secret for signature verification
+  -d '{
+    "url": "https://api.chainalysis.example.com/webhook",
+    "events": ["BLACKLIST_ADD", "SEIZE", "FREEZE"]
+  }'
 ```
 
-## Regulatory Considerations
+### Manual Export
 
-- SSS-2 is designed for institutional stablecoin issuers subject to AML/KYC regulations
-- The TransferHook enforces compliance in real-time (cannot be bypassed by end users)
-- PermanentDelegate enables lawful asset recovery (e.g., court orders)
-- All operations produce an immutable audit trail suitable for regulatory reporting
+Export periods of activity for monthly/quarterly regulator audits via CSV:
+
+```bash
+curl "http://localhost:3003/audit/<MINT_ADDRESS>/export?format=csv&from=2026-01-01&to=2026-03-31" > Q1_2026_Audit_Report.csv
+```

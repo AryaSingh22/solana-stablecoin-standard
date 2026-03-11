@@ -6,61 +6,61 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  SOLANA_VERSION: "1.18.4"
-  ANCHOR_VERSION: "0.30.1"
-  NODE_VERSION: "20"
-
 jobs:
   anchor-test:
-    name: Anchor Test
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: yarn
-
-      - name: Install Rust stable
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
 
-      - name: Cache cargo registry
-        uses: actions/cache@v4
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
+            target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
 
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Install Anchor CLI
         run: |
-          cargo install --git https://github.com/coral-xyz/anchor --tag v${{ env.ANCHOR_VERSION }} anchor-cli --locked
+          cargo install --git https://github.com/coral-xyz/anchor \
+            --tag v0.30.1 anchor-cli --locked
 
-      - name: Install Node dependencies
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
         run: yarn install --frozen-lockfile
 
       - name: Generate test keypair
-        run: solana-keygen new --no-bip39-passphrase --outfile test-keypair.json
+        run: |
+          solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
+          solana config set --url localnet
 
-      - name: Run anchor test
-        env:
-          ANCHOR_WALLET: ./test-keypair.json
-        run: anchor test 2>&1 | tee rerun_anchor_test_ci.log
+      - name: Build programs
+        run: anchor build
 
-      - name: Upload test log
+      - name: Run anchor tests
+        run: anchor test 2>&1 | tee evidence/logs/anchor-test-ci.txt
+
+      - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: anchor-test-log
-          path: rerun_anchor_test_ci.log
+          name: anchor-test-results
+          path: evidence/logs/anchor-test-ci.txt

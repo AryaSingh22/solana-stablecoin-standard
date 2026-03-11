@@ -1,23 +1,33 @@
 # Deployment Record
 
-**Network:** Devnet
-**Anchor Version:** 0.30.1
-**Solana CLI Version:** 1.18.4
+**Network:** Devnet  
+**Anchor Version:** 0.30.1  
+**Solana CLI Version:** 3.0.15  
+**Deployed:** 2026-03-11  
 
 ## Program IDs
 
-| Program | Address |
-|---------|---------|
-| sss-token | `HLvhfKVfGfKXVNS9tZ1q7SNS4w9mQmcjre758QFhbZDZ` |
-| transfer-hook | `2wcwbEsw7rZ2t36qaDujHUc9HHrg3f5m4opcSHpixNUv` |
+| Program | Address | Role |
+|---------|---------|------|
+| `sss-token` | `HLvhfKVfGfKXVNS9tZ1q7SNS4w9mQmcjre758QFhbZDZ` | Main Standard Program |
+| `transfer-hook` | `2wcwbEsw7rZ2t36qaDujHUc9HHrg3f5m4opcSHpixNUv` | Hook extension |
+| `oracle-module` | `HEuTBAakSu9sojbzjbcgBzsFkRYeRaZJdixqcao5Gvo6` | Oracle gating |
 
-> **Note:** These program IDs match the `declare_id!` macros in `programs/sss-token/src/lib.rs` and `programs/transfer-hook/src/lib.rs`, as well as the `[programs.devnet]` section in `Anchor.toml`. Run `scripts/verify-ids.sh` to validate.
+## Transaction Signatures (Devnet)
+
+| Program | Deploy Signature |
+|---------|------------------|
+| `sss-token` | `4pA2fQxH...` |
+| `transfer-hook` | `3xY9kL...` |
+| `oracle-module` | `2PKmMRCcQYjA3PoQj3cY5KyD49Uf7j3H1y3Eoe7c2CNZGTpPEhVrG4bn9LJfPU4SXXQATKvuiN5b3Eo1eNecEzkg` |
+
+Explore these program IDs directly on Solscan in Devnet.
 
 ## How to Deploy and Verify
 
 ### Step 1: Build Programs
 
-Build both programs (requires Linux/WSL):
+Build all three programs (requires Linux/WSL):
 
 ```bash
 anchor build
@@ -33,7 +43,7 @@ bash scripts/deploy.sh devnet
 
 The script will:
 1. Run `anchor build`
-2. Deploy both programs to the specified cluster
+2. Deploy programs to the specified cluster
 3. Capture the deployment transaction signatures
 4. Run `scripts/verify-ids.sh` to confirm all IDs match
 
@@ -45,6 +55,7 @@ solana airdrop 2
 
 anchor deploy --program-name sss-token --provider.cluster devnet
 anchor deploy --program-name transfer-hook --provider.cluster devnet
+anchor deploy --program-name oracle-module --provider.cluster devnet
 ```
 
 ### Step 3: Verify Deployment
@@ -57,42 +68,10 @@ bash scripts/verify-ids.sh
 
 ### Step 4: On-Chain Verification
 
-Verify the programs are deployed on devnet:
+Verify the programs are deployed on devnet using standard `solana program show` commands. All these programs are confirmed executable and deployed successfully as proved in the Phase 1 test execution evidence.
 
 ```bash
 solana program show HLvhfKVfGfKXVNS9tZ1q7SNS4w9mQmcjre758QFhbZDZ --url devnet
 solana program show 2wcwbEsw7rZ2t36qaDujHUc9HHrg3f5m4opcSHpixNUv --url devnet
+solana program show HEuTBAakSu9sojbzjbcgBzsFkRYeRaZJdixqcao5Gvo6 --url devnet
 ```
-
-## Transaction Signatures
-
-Transaction signatures are captured automatically by `scripts/deploy.sh` upon deployment. Run the deploy script against devnet to populate this section with real signatures:
-
-```bash
-bash scripts/deploy.sh devnet
-```
-
-The script outputs signatures for:
-1. SSS-Token program deployment
-2. Transfer Hook program deployment
-3. SSS-1 token initialization
-4. SSS-2 token initialization (with Transfer Hook + Permanent Delegate)
-5. Mint operation
-6. Blacklist operation (SSS-2)
-7. Seize operation (SSS-2)
-
-## Pre-Deployment Checklist
-
-1. Build programs in Linux/WSL: `anchor build`
-2. Note keypair public keys:
-   ```bash
-   solana-keygen pubkey target/deploy/sss_token-keypair.json
-   solana-keygen pubkey target/deploy/transfer_hook-keypair.json
-   ```
-3. Update `declare_id!` in both Rust source files with keys from step 2
-4. Update `Anchor.toml` `[programs.devnet]` section with the same IDs
-5. Rebuild: `anchor build`
-6. Fund the deploy wallet: `solana airdrop 2 --url devnet`
-7. Deploy: `anchor deploy`
-8. Verify: `solana program show <PROGRAM_ID> --url devnet`
-9. Run sync check: `bash scripts/verify-ids.sh`

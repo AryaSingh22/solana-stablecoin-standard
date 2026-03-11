@@ -16,6 +16,8 @@
         "build": "tsup",
         "dev": "tsup --watch",
         "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest",
         "lint": "eslint src --ext .ts"
     },
     "dependencies": {
@@ -31,6 +33,7 @@
     "devDependencies": {
         "typescript": "^5.4.0",
         "@types/node": "^20.0.0",
-        "tsup": "^8.0.0"
+        "tsup": "^8.0.0",
+        "vitest": "^4.0.18"
     }
 }

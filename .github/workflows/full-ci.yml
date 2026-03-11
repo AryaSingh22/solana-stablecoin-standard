@@ -1,0 +1,82 @@
+name: Full CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  rust-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run cargo tests
+        run: cargo test --workspace 2>&1 | tee evidence/logs/cargo-test-ci.txt
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-test-results
+          path: evidence/logs/cargo-test-ci.txt
+
+  typescript-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+      - run: yarn install --frozen-lockfile
+      - name: Typecheck all packages
+        run: |
+          npx tsc --noEmit
+          cd sdk && npx tsc --noEmit && cd ..
+          cd cli && npx tsc --noEmit && cd ..
+          cd services/mint-service && npx tsc --noEmit && cd ../..
+          cd services/webhook-service && npx tsc --noEmit && cd ../..
+
+  sdk-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+      - run: yarn install --frozen-lockfile
+      - name: Run SDK tests
+        run: cd sdk && npx vitest run 2>&1 | tee ../evidence/logs/sdk-vitest-ci.txt
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-test-results
+          path: evidence/logs/sdk-vitest-ci.txt
+
+  docker-health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start services
+        run: docker compose up --build -d
+      - name: Wait for services
+        run: sleep 20
+      - name: Health checks
+        run: |
+          curl -f http://localhost:3001/health
+          curl -f http://localhost:3002/health
+          curl -f http://localhost:3003/health
+          curl -f http://localhost:3004/health
+      - name: Stop services
+        run: docker compose down

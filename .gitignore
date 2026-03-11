@@ -17,6 +17,11 @@ node_modules/
 !Anchor.toml
 !vitest.config.ts
 
+# Documentation and Evidence are explicitly tracked
+!evidence/
+!evidence/**/*.png
+!SUBMISSION.md
+
 # Test keypairs specifically
 test-keypair.json
 id.json

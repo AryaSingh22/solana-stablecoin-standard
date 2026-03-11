@@ -1,112 +1,118 @@
 # Architecture
 
-## System Overview
+## Layer Model
+
+The Solana Stablecoin Standard (SSS) is designed across three distinct layers:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Solana Blockchain                         │
-│  ┌──────────────────┐  ┌──────────────────┐                     │
-│  │   SSS-Token       │  │  Transfer Hook    │                    │
-│  │   (13 ixns)       │◄─│  (pause/blacklist)│                    │
-│  └────────┬─────────┘  └──────────────────┘                     │
-│           │ Token-2022 Extensions                                │
-│           │ • PermanentDelegate  • TransferHook                  │
-│           │ • DefaultAccountState                                │
-└───────────┼─────────────────────────────────────────────────────┘
-            │
-    ┌───────┴───────┐
-    │   SDK / CLI   │  (@stbr/sss-token, sss-token CLI)
-    └───────┬───────┘
-            │
-┌───────────┼─────────────────────────────────────────────────────┐
-│  Backend  │                                                      │
-│  ┌────────┴────────┐  ┌─────────────┐  ┌─────────────────────┐ │
-│  │  mint-service   │  │   indexer   │  │ compliance-service  │ │
-│  │  (mint/burn)    │  │ (events)    │  │ (blacklist/audit)   │ │
-│  └────────┬────────┘  └──────┬──────┘  └──────────┬──────────┘ │
-│           │                  │                     │            │
-│  ┌────────┴──────────────────┴─────────────────────┤            │
-│  │                PostgreSQL + Redis                │            │
-│  └──────────────────────────────────────────────────┘            │
-│  ┌─────────────────┐                                            │
-│  │ webhook-service  │  → External integrations                   │
-│  └─────────────────┘                                            │
-└─────────────────────────────────────────────────────────────────┘
+Layer 3 (Standards)   ┌──────────┐  ┌──────────┐  ┌──────────┐
+                      │  SSS-1   │  │  SSS-2   │  │  SSS-3   │
+                      │ (Basic)  │  │(Compliant│  │ (Exper.) │
+                      └────┬─────┘  └────┬─────┘  └────┬─────┘
+                           │              │             │
+Layer 2 (Modules)    ┌─────┴──────────────┴─────────────┴─────┐
+                     │ Role Mgmt │ Compliance │ Oracle Gating │
+                     │ Quota     │ Blacklist  │ ZK Transfers  │
+                     │ Pause     │ Seizure    │ Allowlist     │
+                     └────────────┬───────────┴───────────────┘
+                                  │
+Layer 1 (Base/SDK)   ┌────────────┴───────────────────────────┐
+                     │           SolanaStablecoin             │
+                     │       Token-2022 CPI Operations        │
+                     │             PDA Derivation             │
+                     └────────────────────────────────────────┘
 ```
 
-## On-Chain Architecture
+## Program Architecture
 
-### PDA Structure
+The on-chain system consists of three Anchor programs:
 
-All PDAs are derived from the **mint address** for consistent addressing:
+1. **`sss-token`**: The core standard program implementing the 16 instructions for minting, role management, pausing, and SSS-2 compliance actions.
+2. **`transfer-hook`**: A Token-2022 Transfer Hook extension program that blocks transfers if the token is paused or if either the source or destination wallet is blacklisted.
+3. **`oracle-module`**: A secondary integration program that allows minting only if an external oracle price feed confirms the stablecoin peg is maintained.
 
-| PDA | Seeds | Purpose |
-|-----|-------|---------|
-| `StablecoinConfig` | `["config", mint]` | Global configuration |
-| `PauseState` | `["pause_state", mint]` | Pause flag |
-| `RoleRecord` | `["role", mint, holder, role_type]` | Role assignment |
-| `MinterQuota` | `["minter_quota", mint, minter]` | Mint rate limiting |
-| `BlacklistEntry` | `["blacklist", mint, wallet_authority]` | Compliance blacklist (uses wallet owner, not token account) |
-| `ExtraAccountMetaList` | `["extra-account-metas", mint]` | Transfer hook metadata |
+## Account/PDA Layout
 
-### Authority Model
+All Program Derived Addresses (PDAs) are strictly derived from the **mint address** and specific seed prefixes to ensure consistent addressing across the ecosystem.
 
-The **Config PDA** acts as the program-controlled authority for the Token-2022 mint:
-- Mint authority → Config PDA (CPI with PDA signer)
-- Freeze authority → Config PDA
-- This enables program-enforced rules for all token operations
+| PDA | Seeds | Size (Bytes) | Purpose |
+|-----|-------|--------------|---------|
+| `StablecoinConfig` | `["config", mint]` | 129 | Global configuration (name, symbol, decimals). |
+| `PauseState` | `["pause_state", mint]` | 37 | Global pause flag to halt all transfers. |
+| `RoleRecord` | `["role", mint, holder, role_type]` | 65 | Role assignment (Master, Minter, Burner, etc). |
+| `MinterQuota` | `["minter_quota", mint, minter]` | 53 | Mint rate limiting (daily/weekly/monthly limits). |
+| `BlacklistEntry` | `["blacklist", mint, wallet_authority]` | 45 | Compliance blacklist (uses wallet owner, not token account). |
+| `AllowlistEntry` | `["allowlist", mint, wallet_authority]` | 29 | Regulatory gating for SSS-3 transfers. |
+| `ExtraAccountMetaList` | `["extra-account-metas", mint]` | Variable | Transfer hook metadata mapping for Token-2022. |
+| `OracleConfig` | `["oracle_config", mint]` | 130 | Price feed parameters and active status. |
 
-### Transfer Hook Flow
+## Transfer Hook Data Flow
 
-```
-User initiates transfer
-    │
-    ▼
-Token-2022 calls TransferHook.execute()
-    │
-    ├── Check PauseState → Reject if paused
-    │
-    └── Check BlacklistEntry (sender & recipient) → Reject if blacklisted
-```
-
-## Data Flow
-
-### Mint Operation
+The `transfer-hook` program intercepts every token transfer at the protocol level.
 
 ```
-1. Operator calls CLI/SDK → mintTokens()
-2. SDK derives PDAs (config, pause, role, quota)
-3. SDK builds Anchor instruction
-4. Transaction submitted to Solana
-5. On-chain: validate role → check pause → check quota → CPI mint_to
-6. Indexer picks up event → writes to PostgreSQL
-7. Webhook service delivers to registered endpoints
+[User Transfer TX]
+       │
+       ▼
+Token-2022 Program: 
+Is Transfer Hook enabled for this Mint? ──YES──► Call TransferHook.execute()
+                                                          │
+   ┌──────────────────────────────────────────────────────┘
+   │
+   ├── 1. Resolve ExtraAccountMetaList PDA
+   ├── 2. Load `PauseState` PDA ───────────────► IF true: Reject Transfer
+   ├── 3. Load `BlacklistEntry` (Source) ──────► IF active: Reject Transfer
+   ├── 4. Load `BlacklistEntry` (Destination) ─► IF active: Reject Transfer
+   │
+   └──► ALL CLEAR ──► Return Ok() ──► Token-2022 Completes Transfer
 ```
 
-### Compliance Event
+**Note on Blacklist Resolution:** The hook explicitly reads the `owner` authority (bytes 32..64) from the associated token account data to derive the `BlacklistEntry` PDA. Blacklisting a token account address has no effect; the actual user wallet must be blacklisted.
 
-```
-1. Blacklister calls addToBlacklist()
-2. On-chain: creates BlacklistEntry PDA + freezes token account
-3. Subsequent transfers: TransferHook.execute() blocks
-4. Indexer writes ComplianceEvent to database
-5. Compliance service exposes API for audit queries
-```
+## Data Flows
 
-## Database Schema
+### Minting Flow
 
-7 models across 3 domains:
+1. **Operator** uses CLI/SDK: `sss-token mint <recipient> <amount>`
+2. **SDK** automatically derives necessary PDAs (`config`, `pause_state`, `minter_quota`).
+3. **Anchor** CPIs into `sss-token` program -> `mint_tokens` instruction.
+4. **On-Chain checks**:
+   - Is token paused?
+   - Does sender have `Minter` role?
+   - Does mint amount exceed remaining quota for current period?
+5. **On-Chain Action**: CPI to Token-2022 `mint_to`.
+6. **Backend**: `indexer` picks up the transaction signature from RPC.
+7. **Backend**: Saves `MintOperation` row to PostgreSQL.
+8. **Backend**: `webhook-service` fires HTTP POST to registered listeners.
 
-- **Token**: `Stablecoin`, `MintOperation`, `BurnOperation`
-- **Compliance**: `ComplianceEvent`
-- **Webhook**: `Webhook`, `WebhookDelivery`
-- **Indexer**: `IndexerState`
+### Compliance Seize Flow
+
+1. **Law Enforcement/Admin** uses CLI/SDK: `sss-token seize <frozen_account> <amount>`
+2. **On-Chain checks**:
+   - Does sender have `Seizer` role?
+   - Is the target `<frozen_account>` actually frozen? (Required)
+   - Is the target wallet blacklisted? (Required)
+3. **On-Chain Action**: CPI to Token-2022 `transfer_checked` (force moving funds) OR `burn` followed by `mint` depending on implementation approach. (Currently uses Burn/Mint replacement).
+4. **Backend**: `indexer` reads the seize event payload.
+5. **Backend**: Saves `ComplianceEvent` to the regulatory audit log database.
+
+## Role Model
+
+SSS employs a strict Role-Based Access Control (RBAC) model. 
+
+- **MasterAuthority**: Can grant/revoke roles and configure the stablecoin. Cannot mint or seize directly without assigning themselves the role.
+- **Minter**: Can execute `mint_tokens`, constrained by `MinterQuota`.
+- **Burner**: Can execute `burn_tokens` from their own accounts.
+- **Pauser**: Can execute `pause` and `unpause` instructions.
+- **Blacklister**: Can execute `add_to_blacklist`, `remove_from_blacklist`, `freeze_account`, and `thaw_account`.
+- **Seizer**: Can execute `seize` against frozen/blacklisted accounts.
 
 ## Security Model
 
-| Layer | Mechanism |
-|-------|-----------|
-| **On-chain** | Role-based access (6 roles), PDA authority, quota enforcement |
-| **Transfer** | Real-time hook enforcement (pause + blacklist) |
-| **Audit** | Immutable role records (deactivated, never deleted) |
-| **Backend** | HMAC webhook signing, structured audit logging |
+| Feature | Mechanism |
+|---------|-----------|
+| **Immutability of Extensions** | Token-2022 extensions (like `TransferHook` and `PermanentDelegate`) are locked permanently via `StablecoinConfig` flags during initialization. |
+| **Audit Trails** | `RoleRecord` and `BlacklistEntry` accounts are **never deleted**. When a role is revoked or a blacklist lifted, an `active` boolean is flipped to `false`. This preserves historical on-chain evidence of all compliance actions. |
+| **Supply Protection** | Minting uses Rust checked math (`checked_add`) to prevent overflow exploits. Quota periods ensure compromised Minter keys have explicitly bounded impact. |
+| **Oracle Safety** | The `oracle-module` requires an active feed. If the feed goes stale beyond `max_staleness_seconds`, mints revert. |
+| **Fuzz Testing** | Business logic is verified with Trident fuzz harnesses running thousands of pseudo-random interaction sequences to prove invariant safety. |
