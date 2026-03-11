@@ -29,7 +29,7 @@ jobs:
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Generate test keypair
-        run: solana-keygen new --no-bip39-passphrase --outfile ./test-keypair.json
+        run: $HOME/.local/share/solana/install/active_release/bin/solana-keygen new --no-bip39-passphrase --outfile ./test-keypair.json
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
