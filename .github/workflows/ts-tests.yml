@@ -24,12 +24,13 @@ jobs:
           cache: yarn
 
       - name: Install Solana CLI
-        uses: shivammathur/setup-solana@v2
-        with:
-          solana-version: ${{ env.SOLANA_VERSION }}
+        run: |
+          mkdir -p $HOME/.local/share/solana/install/active_release/bin
+          sh -c "$(curl -sSfL --retry 5 --retry-delay 2 --retry-connrefused https://release.solana.com/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Generate test keypair
-        run: solana-keygen new --no-bip39-passphrase --outfile ./test-keypair.json
+        run: $HOME/.local/share/solana/install/active_release/bin/solana-keygen new --no-bip39-passphrase --outfile ./test-keypair.json
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
