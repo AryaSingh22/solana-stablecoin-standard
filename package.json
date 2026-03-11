@@ -15,7 +15,7 @@
   "scripts": {
     "build": "yarn workspaces run build",
     "test": "yarn workspaces run test",
-    "test:unit": "npx cross-env ANCHOR_WALLET=$HOME/.config/solana/id.json ANCHOR_PROVIDER_URL=http://127.0.0.1:8899 npx ts-mocha tests/unit/*.test.ts",
+    "test:unit": "npx cross-env ANCHOR_PROVIDER_URL=http://127.0.0.1:8899 npx ts-mocha tests/unit/*.test.ts",
     "test:cargo": "cargo test --workspace",
     "lint": "yarn workspaces run lint",
     "typecheck": "yarn workspaces run typecheck"
