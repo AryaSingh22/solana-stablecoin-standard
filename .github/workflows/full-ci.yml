@@ -69,6 +69,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and start services
         run: docker compose up --build -d
+        env:
+          POSTGRES_PASSWORD: sss_dev_password
+          SOLANA_RPC_URL: http://localhost:8899
+          SSS_PROGRAM_ID: SSS11111111111111111111111111111111111111111
+          MINTER_KEYPAIR: '[1,2,3]'
       - name: Wait for services
         run: sleep 20
       - name: Health checks
