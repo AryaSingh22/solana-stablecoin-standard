@@ -56,7 +56,7 @@ jobs:
 
       - name: Build programs
         run: |
-          $GITHUB_WORKSPACE/solana-release/bin/solana config set --url localnet
+          $GITHUB_WORKSPACE/solana-release/bin/solana config set --url localhost
           anchor build
 
       - name: Run unit tests

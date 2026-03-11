@@ -52,7 +52,7 @@ jobs:
         run: |
           mkdir -p ~/.config/solana
           $GITHUB_WORKSPACE/solana-release/bin/solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
-          $GITHUB_WORKSPACE/solana-release/bin/solana config set --url localnet
+          $GITHUB_WORKSPACE/solana-release/bin/solana config set --url localhost
 
       - name: Build programs
         run: anchor build
