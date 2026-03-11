@@ -78,7 +78,9 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: TypeScript check (SDK)
-        run: yarn workspace @stbr/sss-token run typecheck
+        run: |
+          yarn workspace @stbr/sss-token run typecheck
+          yarn workspace @stbr/sss-token run build
 
       - name: TypeScript check (CLI)
         run: yarn workspace @stbr/sss-cli run typecheck
