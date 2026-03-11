@@ -40,7 +40,7 @@ jobs:
       - run: yarn install --frozen-lockfile
       - name: Typecheck all packages
         run: |
-          cd sdk && yarn tsc --noEmit && cd ..
+          cd sdk && yarn tsc --noEmit && yarn build && cd ..
           cd cli && yarn tsc --noEmit && cd ..
 
   sdk-tests:
