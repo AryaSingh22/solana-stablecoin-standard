@@ -37,8 +37,8 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          mkdir -p $HOME/.local/share/solana/install/active_release/bin
-          sh -c "$(curl -sSfL --retry 5 --retry-delay 2 --retry-connrefused https://release.solana.com/stable/install)"
+          curl -sSfL --retry 5 --retry-delay 2 --retry-connrefused -o install_solana.sh https://release.solana.com/stable/install
+          sh install_solana.sh
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Install Anchor CLI
