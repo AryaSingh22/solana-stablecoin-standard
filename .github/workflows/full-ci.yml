@@ -40,7 +40,6 @@ jobs:
       - run: yarn install --frozen-lockfile
       - name: Typecheck all packages
         run: |
-          npx tsc --noEmit
           cd sdk && npx tsc --noEmit && cd ..
           cd cli && npx tsc --noEmit && cd ..
           cd services/mint-service && npx tsc --noEmit && cd ../..
