@@ -29,9 +29,9 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install Solana CLI
-        run: |
-          sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+        uses: shivammathur/setup-solana@v2
+        with:
+          solana-version: "1.18.4"
 
       - name: Install Anchor CLI
         run: |
@@ -50,8 +50,8 @@ jobs:
       - name: Generate test keypair
         run: |
           mkdir -p ~/.config/solana
-          $HOME/.local/share/solana/install/active_release/bin/solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
-          $HOME/.local/share/solana/install/active_release/bin/solana config set --url localnet
+          solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
+          solana config set --url localnet
 
       - name: Build programs
         run: anchor build

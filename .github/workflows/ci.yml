@@ -36,9 +36,9 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Install Solana CLI
-        run: |
-          sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+        uses: shivammathur/setup-solana@v2
+        with:
+          solana-version: ${{ env.SOLANA_VERSION }}
 
       - name: Install Anchor CLI
         run: |
