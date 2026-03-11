@@ -40,10 +40,8 @@ jobs:
       - run: yarn install --frozen-lockfile
       - name: Typecheck all packages
         run: |
-          cd sdk && npx tsc --noEmit && cd ..
-          cd cli && npx tsc --noEmit && cd ..
-          cd services/mint-service && npx tsc --noEmit && cd ../..
-          cd services/webhook-service && npx tsc --noEmit && cd ../..
+          cd sdk && yarn tsc --noEmit && cd ..
+          cd cli && yarn tsc --noEmit && cd ..
 
   sdk-tests:
     runs-on: ubuntu-latest

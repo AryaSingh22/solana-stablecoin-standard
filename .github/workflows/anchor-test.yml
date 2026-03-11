@@ -49,8 +49,9 @@ jobs:
 
       - name: Generate test keypair
         run: |
-          solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
-          solana config set --url localnet
+          mkdir -p ~/.config/solana
+          $HOME/.local/share/solana/install/active_release/bin/solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
+          $HOME/.local/share/solana/install/active_release/bin/solana config set --url localnet
 
       - name: Build programs
         run: anchor build
