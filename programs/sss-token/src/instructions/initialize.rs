@@ -290,7 +290,7 @@ fn invoke_initialize_permanent_delegate(
         mint_info.key,
         delegate,
     )?;
-    anchor_lang::solana_program::program::invoke(&ix, &[mint_info.clone()])?;
+    anchor_lang::solana_program::program::invoke(&ix, std::slice::from_ref(mint_info))?;
     Ok(())
 }
 
@@ -307,7 +307,7 @@ fn invoke_initialize_transfer_hook(
             Some(*authority),
             Some(*hook_program_id),
         )?;
-    anchor_lang::solana_program::program::invoke(&ix, &[mint_info.clone()])?;
+    anchor_lang::solana_program::program::invoke(&ix, std::slice::from_ref(mint_info))?;
     Ok(())
 }
 
@@ -322,6 +322,6 @@ fn invoke_initialize_default_account_state(
             mint_info.key,
             &state,
         )?;
-    anchor_lang::solana_program::program::invoke(&ix, &[mint_info.clone()])?;
+    anchor_lang::solana_program::program::invoke(&ix, std::slice::from_ref(mint_info))?;
     Ok(())
 }

@@ -20,3 +20,12 @@ anchor-syn = { path = "patches/anchor-syn" }
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
+
+[workspace.lints.rust]
+unused_comparisons = "allow"
+unexpected_cfgs = "allow"
+
+[workspace.lints.clippy]
+absurd_extreme_comparisons = "allow"
+assertions_on_constants = "allow"
+bool_assert_comparison = "allow"

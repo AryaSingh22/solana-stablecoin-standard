@@ -30,3 +30,5 @@ bytemuck_derive = "=1.8.1"
 constant_time_eq = "=0.3.1"
 getrandom = "=0.2.14"
 
+[lints]
+workspace = true
