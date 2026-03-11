@@ -37,7 +37,7 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_VERSION }}/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Install Anchor CLI
@@ -81,7 +81,7 @@ jobs:
         run: yarn workspace @stbr/sss-token run typecheck
 
       - name: TypeScript check (CLI)
-        run: yarn workspace @stbr/sss-token-cli run typecheck
+        run: yarn workspace @stbr/sss-cli run typecheck
 
       - name: Run tests
         run: yarn test
