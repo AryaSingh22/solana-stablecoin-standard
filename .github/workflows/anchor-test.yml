@@ -30,11 +30,9 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          for i in 1 2 3 4 5; do
-            curl -sSfL -o install_solana.sh https://release.solana.com/stable/install && break || sleep 5
-          done
-          sh install_solana.sh
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          wget https://github.com/solana-labs/solana/releases/download/v1.18.4/solana-release-x86_64-unknown-linux-gnu.tar.bz2
+          tar jxf solana-release-x86_64-unknown-linux-gnu.tar.bz2
+          echo "$GITHUB_WORKSPACE/solana-release/bin" >> $GITHUB_PATH
 
       - name: Install Anchor CLI
         run: |
@@ -53,8 +51,8 @@ jobs:
       - name: Generate test keypair
         run: |
           mkdir -p ~/.config/solana
-          $HOME/.local/share/solana/install/active_release/bin/solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
-          $HOME/.local/share/solana/install/active_release/bin/solana config set --url localnet
+          $GITHUB_WORKSPACE/solana-release/bin/solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
+          $GITHUB_WORKSPACE/solana-release/bin/solana config set --url localnet
 
       - name: Build programs
         run: anchor build
