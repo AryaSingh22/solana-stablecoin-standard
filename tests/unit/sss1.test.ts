@@ -227,13 +227,21 @@ describe("SSS-1 Unit Tests", () => {
             const [minterRolePda] = findRolePda(minter.publicKey, ROLE_MINTER);
             const [quotaPda] = findQuotaPda(minter.publicKey);
 
-            const recipientAta = getAssociatedTokenAddressSync(
-                mint.publicKey,
-                recipient.publicKey,
-                false,
-                TOKEN_2022_PROGRAM_ID,
-                ASSOCIATED_TOKEN_PROGRAM_ID,
-            );
+            const recipientAtaInfo = await anchor.utils.token.associatedAddress({
+                mint: mint.publicKey,
+                owner: recipient.publicKey
+            });
+            try {
+                await getAccount(provider.connection, recipientAtaInfo, "confirmed", TOKEN_2022_PROGRAM_ID);
+            } catch {
+                const tx = new anchor.web3.Transaction().add(
+                    require("@solana/spl-token").createAssociatedTokenAccountInstruction(
+                        authority.publicKey, recipientAtaInfo, recipient.publicKey, mint.publicKey, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+                    )
+                );
+                await provider.connection.sendTransaction(tx, [((provider.wallet as anchor.Wallet).payer)]);
+            }
+            const recipientAta = recipientAtaInfo;
 
             await program.methods
                 .mintTokens(new BN(1_000_000))
@@ -607,12 +615,6 @@ describe("SSS-1 Unit Tests", () => {
             const config = await (program.account as any).stablecoinConfig.fetch(configPda);
             expect(config.authority.equals(newAuthority.publicKey)).to.be.true;
 
-            // Transfer back
-            await program.methods
-                .transferAuthority(authority.publicKey)
-                .accounts({ authority: newAuthority.publicKey, config: configPda, oldMasterRole: newMasterPda, newMasterRole: oldMasterPda, systemProgram: SystemProgram.programId })
-                .signers([newAuthority])
-                .rpc();
         });
     });
 });
