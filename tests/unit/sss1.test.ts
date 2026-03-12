@@ -393,6 +393,16 @@ describe("SSS-1 Unit Tests", () => {
                 .rpc();
 
             const burnerAta = getAssociatedTokenAddressSync(mint.publicKey, burner.publicKey, false, TOKEN_2022_PROGRAM_ID);
+            try {
+                await getAccount(provider.connection, burnerAta, "confirmed", TOKEN_2022_PROGRAM_ID);
+            } catch {
+                const tx = new anchor.web3.Transaction().add(
+                    require("@solana/spl-token").createAssociatedTokenAccountInstruction(
+                        authority.publicKey, burnerAta, burner.publicKey, mint.publicKey, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+                    )
+                );
+                await provider.connection.sendTransaction(tx, [((provider.wallet as anchor.Wallet).payer)]);
+            }
 
             // Mint to burner
             await program.methods
@@ -454,6 +464,16 @@ describe("SSS-1 Unit Tests", () => {
             const [configPda] = findConfigPda();
             const [masterRolePda] = findRolePda(authority.publicKey, ROLE_MASTER);
             const recipientAta = getAssociatedTokenAddressSync(mint.publicKey, recipient.publicKey, false, TOKEN_2022_PROGRAM_ID);
+            try {
+                await getAccount(provider.connection, recipientAta, "confirmed", TOKEN_2022_PROGRAM_ID);
+            } catch {
+                const tx = new anchor.web3.Transaction().add(
+                    require("@solana/spl-token").createAssociatedTokenAccountInstruction(
+                        authority.publicKey, recipientAta, recipient.publicKey, mint.publicKey, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+                    )
+                );
+                await provider.connection.sendTransaction(tx, [((provider.wallet as anchor.Wallet).payer)]);
+            }
 
             await program.methods
                 .freezeAccount()
@@ -571,8 +591,9 @@ describe("SSS-1 Unit Tests", () => {
     describe("role management", () => {
         it("transfers authority and changes master key", async () => {
             const newAuthority = Keypair.generate();
-            const sig = await provider.connection.requestAirdrop(newAuthority.publicKey, anchor.web3.LAMPORTS_PER_SOL);
-            await provider.connection.confirmTransaction(sig);
+            // DO NOT requestAirdrop to newAuthority before transferAuthority.
+            // Anchor 0.30 `[account(init)]` for System Accounts crashes with 'account already in use'
+            // if the PDA exists with balance beforehand. We let Anchor init the PDA directly.
 
             const [configPda] = findConfigPda();
             const [oldMasterPda] = findRolePda(authority.publicKey, ROLE_MASTER);

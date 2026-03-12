@@ -201,6 +201,17 @@ describe("SSS-2 Unit Tests", () => {
             // Mint tokens to target
             const [pausePda] = findPausePda();
             const targetAta = getAssociatedTokenAddressSync(mint2.publicKey, target.publicKey, false, TOKEN_2022_PROGRAM_ID);
+            try {
+                await getAccount(provider.connection, targetAta, "confirmed", TOKEN_2022_PROGRAM_ID);
+            } catch {
+                const tx = new anchor.web3.Transaction().add(
+                    require("@solana/spl-token").createAssociatedTokenAccountInstruction(
+                        authority.publicKey, targetAta, target.publicKey, mint2.publicKey, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+                    )
+                );
+                await provider.connection.sendTransaction(tx, [((provider.wallet as anchor.Wallet).payer)]);
+            }
+
             await program.methods
                 .mintTokens(new BN(1_000_000))
                 .accounts({
