@@ -189,7 +189,7 @@ describe("SSS-2 Unit Tests", () => {
                 .rpc();
 
             await program.methods
-                .updateMinter(minter.publicKey, new BN(10_000_000_000), { unlimited: {} })
+                .updateMinter(minter.publicKey, new BN(10_000_000_000), { lifetime: {} })
                 .accounts({ authority: authority.publicKey, config: configPda, authorityRole: masterRolePda, minterRole: minterRolePda, minterQuota: quotaPda, systemProgram: SystemProgram.programId })
                 .rpc();
 

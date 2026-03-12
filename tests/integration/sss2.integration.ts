@@ -127,7 +127,7 @@ describe("SSS-2 Integration Test — Full Compliance Lifecycle", () => {
         const [pauserRolePda] = findRolePda(pauser.publicKey, ROLE_PAUSER);
 
         await program.methods.updateRoles(minter.publicKey, { minter: {} }, true).accounts({ authority: authority.publicKey, config: configPda, authorityRole: masterRolePda, targetRole: minterRolePda, systemProgram: SystemProgram.programId }).rpc();
-        await program.methods.updateMinter(minter.publicKey, new BN(100_000_000_000), { unlimited: {} }).accounts({ authority: authority.publicKey, config: configPda, authorityRole: masterRolePda, minterRole: minterRolePda, minterQuota: quotaPda, systemProgram: SystemProgram.programId }).rpc();
+        await program.methods.updateMinter(minter.publicKey, new BN(100_000_000_000), { lifetime: {} }).accounts({ authority: authority.publicKey, config: configPda, authorityRole: masterRolePda, minterRole: minterRolePda, minterQuota: quotaPda, systemProgram: SystemProgram.programId }).rpc();
         await program.methods.updateRoles(blacklister.publicKey, { blacklister: {} }, true).accounts({ authority: authority.publicKey, config: configPda, authorityRole: masterRolePda, targetRole: blacklisterRolePda, systemProgram: SystemProgram.programId }).rpc();
         await program.methods.updateRoles(pauser.publicKey, { pauser: {} }, true).accounts({ authority: authority.publicKey, config: configPda, authorityRole: masterRolePda, targetRole: pauserRolePda, systemProgram: SystemProgram.programId }).rpc();
 

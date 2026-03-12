@@ -49,10 +49,8 @@ describe("Transfer Hook Execute - Dead Code Utilization Tests", () => {
         const [fakePausePda] = findPausePda(fakeMint.publicKey);
         const [fakeMasterRolePda] = findRolePda(fakeMint.publicKey, authority.publicKey, ROLE_MASTER);
 
-        const sig1 = await provider.connection.requestAirdrop(fakeMint.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
-        const sig2 = await provider.connection.requestAirdrop(mint.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
-        await provider.connection.confirmTransaction(sig1);
-        await provider.connection.confirmTransaction(sig2);
+        // Mints do not need airdrops because they are allocated via System Program create_account
+        // Airdropping lamports beforehand causes "already in use" allocation errors.
 
         await sssProgram.methods
             .initialize({

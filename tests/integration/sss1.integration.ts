@@ -119,7 +119,7 @@ describe("SSS-1 Integration Test — Full Lifecycle", () => {
             .rpc();
 
         await program.methods
-            .updateMinter(minter.publicKey, new BN(100_000_000), { unlimited: {} })
+            .updateMinter(minter.publicKey, new BN(100_000_000), { lifetime: {} })
             .accounts({ authority: authority.publicKey, config: configPda, authorityRole: masterRolePda, minterRole: minterRolePda, minterQuota: quotaPda, systemProgram: SystemProgram.programId })
             .rpc();
 
