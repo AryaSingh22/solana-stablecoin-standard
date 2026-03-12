@@ -63,7 +63,10 @@ jobs:
         env:
           ANCHOR_WALLET: ./test-keypair.json
           ANCHOR_PROVIDER_URL: http://127.0.0.1:8899
-        run: yarn test:unit
+        run: |
+          anchor localnet --skip-build &
+          sleep 15
+          yarn test:unit
 
       - name: Run SDK tests
         env:
