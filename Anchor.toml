@@ -19,7 +19,7 @@ url = "https://api.apr.dev"
 
 [provider]
 cluster = "localnet"
-wallet = "~/.config/solana/id.json"
+wallet = "./test-keypair.json"
 
 [test]
 startup_wait = 10000
