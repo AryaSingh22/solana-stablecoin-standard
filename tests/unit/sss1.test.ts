@@ -227,21 +227,36 @@ describe("SSS-1 Unit Tests", () => {
             const [minterRolePda] = findRolePda(minter.publicKey, ROLE_MINTER);
             const [quotaPda] = findQuotaPda(minter.publicKey);
 
-            const recipientAtaInfo = await anchor.utils.token.associatedAddress({
-                mint: mint.publicKey,
-                owner: recipient.publicKey
-            });
+            // Derive the recipient ATA using the Token-2022 program ID so that
+            // the on-chain associated token program sees matching seeds.
+            const recipientAta = getAssociatedTokenAddressSync(
+                mint.publicKey,
+                recipient.publicKey,
+                false,
+                TOKEN_2022_PROGRAM_ID,
+            );
             try {
-                await getAccount(provider.connection, recipientAtaInfo, "confirmed", TOKEN_2022_PROGRAM_ID);
+                await getAccount(
+                    provider.connection,
+                    recipientAta,
+                    "confirmed",
+                    TOKEN_2022_PROGRAM_ID,
+                );
             } catch {
                 const tx = new anchor.web3.Transaction().add(
                     require("@solana/spl-token").createAssociatedTokenAccountInstruction(
-                        authority.publicKey, recipientAtaInfo, recipient.publicKey, mint.publicKey, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
-                    )
+                        authority.publicKey,
+                        recipientAta,
+                        recipient.publicKey,
+                        mint.publicKey,
+                        TOKEN_2022_PROGRAM_ID,
+                        ASSOCIATED_TOKEN_PROGRAM_ID,
+                    ),
                 );
-                await provider.connection.sendTransaction(tx, [((provider.wallet as anchor.Wallet).payer)]);
+                await provider.connection.sendTransaction(tx, [
+                    (provider.wallet as anchor.Wallet).payer,
+                ]);
             }
-            const recipientAta = recipientAtaInfo;
 
             await program.methods
                 .mintTokens(new BN(1_000_000))
