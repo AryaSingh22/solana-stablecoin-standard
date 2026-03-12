@@ -18,7 +18,7 @@ oracle_module = "HEuTBAakSu9sojbzjbcgBzsFkRYeRaZJdixqcao5Gvo6"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Devnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [test]
