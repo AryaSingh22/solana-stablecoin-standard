@@ -21,6 +21,7 @@ import {
     getAssociatedTokenAddressSync,
     ASSOCIATED_TOKEN_PROGRAM_ID,
     getAccount,
+    getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
 import { expect } from "chai";
 
@@ -227,36 +228,18 @@ describe("SSS-1 Unit Tests", () => {
             const [minterRolePda] = findRolePda(minter.publicKey, ROLE_MINTER);
             const [quotaPda] = findQuotaPda(minter.publicKey);
 
-            // Derive the recipient ATA using the Token-2022 program ID so that
-            // the on-chain associated token program sees matching seeds.
-            const recipientAta = getAssociatedTokenAddressSync(
+            const recipientAtaAccount = await getOrCreateAssociatedTokenAccount(
+                provider.connection,
+                (provider.wallet as anchor.Wallet).payer,
                 mint.publicKey,
                 recipient.publicKey,
                 false,
+                "confirmed",
+                undefined,
                 TOKEN_2022_PROGRAM_ID,
+                ASSOCIATED_TOKEN_PROGRAM_ID,
             );
-            try {
-                await getAccount(
-                    provider.connection,
-                    recipientAta,
-                    "confirmed",
-                    TOKEN_2022_PROGRAM_ID,
-                );
-            } catch {
-                const tx = new anchor.web3.Transaction().add(
-                    require("@solana/spl-token").createAssociatedTokenAccountInstruction(
-                        authority.publicKey,
-                        recipientAta,
-                        recipient.publicKey,
-                        mint.publicKey,
-                        TOKEN_2022_PROGRAM_ID,
-                        ASSOCIATED_TOKEN_PROGRAM_ID,
-                    ),
-                );
-                await provider.connection.sendTransaction(tx, [
-                    (provider.wallet as anchor.Wallet).payer,
-                ]);
-            }
+            const recipientAta = recipientAtaAccount.address;
 
             await program.methods
                 .mintTokens(new BN(1_000_000))
@@ -276,7 +259,12 @@ describe("SSS-1 Unit Tests", () => {
                 .signers([minter])
                 .rpc();
 
-            const account = await getAccount(provider.connection, recipientAta, "confirmed", TOKEN_2022_PROGRAM_ID);
+            const account = await getAccount(
+                provider.connection,
+                recipientAta,
+                "confirmed",
+                TOKEN_2022_PROGRAM_ID,
+            );
             expect(Number(account.amount)).to.equal(1_000_000);
         });
 
@@ -409,50 +397,77 @@ describe("SSS-1 Unit Tests", () => {
             const [authorityRolePda] = findRolePda(authority.publicKey, ROLE_MASTER);
             const [burnerRolePda] = findRolePda(burner.publicKey, ROLE_BURNER);
 
-            // Grant burner role
             await program.methods
                 .updateRoles(burner.publicKey, { burner: {} }, true)
-                .accounts({ authority: authority.publicKey, config: configPda, authorityRole: authorityRolePda, targetRole: burnerRolePda, systemProgram: SystemProgram.programId })
+                .accounts({
+                    authority: authority.publicKey,
+                    config: configPda,
+                    authorityRole: authorityRolePda,
+                    targetRole: burnerRolePda,
+                    systemProgram: SystemProgram.programId,
+                })
                 .rpc();
 
-            const burnerAta = getAssociatedTokenAddressSync(mint.publicKey, burner.publicKey, false, TOKEN_2022_PROGRAM_ID);
-            try {
-                await getAccount(provider.connection, burnerAta, "confirmed", TOKEN_2022_PROGRAM_ID);
-            } catch {
-                const tx = new anchor.web3.Transaction().add(
-                    require("@solana/spl-token").createAssociatedTokenAccountInstruction(
-                        authority.publicKey, burnerAta, burner.publicKey, mint.publicKey, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
-                    )
-                );
-                await provider.connection.sendTransaction(tx, [((provider.wallet as anchor.Wallet).payer)]);
-            }
+            const burnerAtaAccount = await getOrCreateAssociatedTokenAccount(
+                provider.connection,
+                (provider.wallet as anchor.Wallet).payer,
+                mint.publicKey,
+                burner.publicKey,
+                false,
+                "confirmed",
+                undefined,
+                TOKEN_2022_PROGRAM_ID,
+                ASSOCIATED_TOKEN_PROGRAM_ID,
+            );
+            const burnerAta = burnerAtaAccount.address;
 
-            // Mint to burner
             await program.methods
                 .mintTokens(new BN(500_000))
                 .accounts({
-                    minter: minter.publicKey, config: configPda, pauseState: pausePda,
-                    minterRole: minterRolePda, minterQuota: quotaPda, mint: mint.publicKey,
-                    recipientTokenAccount: burnerAta, recipient: burner.publicKey,
-                    tokenProgram: TOKEN_2022_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+                    minter: minter.publicKey,
+                    config: configPda,
+                    pauseState: pausePda,
+                    minterRole: minterRolePda,
+                    minterQuota: quotaPda,
+                    mint: mint.publicKey,
+                    recipientTokenAccount: burnerAta,
+                    recipient: burner.publicKey,
+                    tokenProgram: TOKEN_2022_PROGRAM_ID,
+                    associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                     systemProgram: SystemProgram.programId,
                 })
                 .signers([minter])
                 .rpc();
 
-            // Burn
+            const before = await getAccount(
+                provider.connection,
+                burnerAta,
+                "confirmed",
+                TOKEN_2022_PROGRAM_ID,
+            );
+            expect(Number(before.amount)).to.equal(500_000);
+
             await program.methods
                 .burnTokens(new BN(100_000))
                 .accounts({
-                    burner: burner.publicKey, config: configPda, pauseState: pausePda,
-                    burnerRole: burnerRolePda, mint: mint.publicKey,
-                    burnerTokenAccount: burnerAta, tokenProgram: TOKEN_2022_PROGRAM_ID,
+                    burner: burner.publicKey,
+                    config: configPda,
+                    pauseState: pausePda,
+                    burnerRole: burnerRolePda,
+                    mint: mint.publicKey,
+                    burnerTokenAccount: burnerAta,
+                    tokenProgram: TOKEN_2022_PROGRAM_ID,
                 })
                 .signers([burner])
                 .rpc();
 
-            const account = await getAccount(provider.connection, burnerAta, "confirmed", TOKEN_2022_PROGRAM_ID);
-            expect(Number(account.amount)).to.equal(400_000);
+            const after = await getAccount(
+                provider.connection,
+                burnerAta,
+                "confirmed",
+                TOKEN_2022_PROGRAM_ID,
+            );
+            expect(Number(after.amount)).to.equal(400_000);
         });
 
         it("rejects burn from non-burner (BurnerNotFound)", async () => {
@@ -483,41 +498,70 @@ describe("SSS-1 Unit Tests", () => {
     // freeze / thaw
     // =========================================================================
     describe("freeze / thaw", () => {
+        async function ensureRecipientAta(): Promise<PublicKey> {
+            const account = await getOrCreateAssociatedTokenAccount(
+                provider.connection,
+                (provider.wallet as anchor.Wallet).payer,
+                mint.publicKey,
+                recipient.publicKey,
+                false,
+                "confirmed",
+                undefined,
+                TOKEN_2022_PROGRAM_ID,
+                ASSOCIATED_TOKEN_PROGRAM_ID,
+            );
+            return account.address;
+        }
+
         it("freezes a token account", async () => {
             const [configPda] = findConfigPda();
             const [masterRolePda] = findRolePda(authority.publicKey, ROLE_MASTER);
-            const recipientAta = getAssociatedTokenAddressSync(mint.publicKey, recipient.publicKey, false, TOKEN_2022_PROGRAM_ID);
-            try {
-                await getAccount(provider.connection, recipientAta, "confirmed", TOKEN_2022_PROGRAM_ID);
-            } catch {
-                const tx = new anchor.web3.Transaction().add(
-                    require("@solana/spl-token").createAssociatedTokenAccountInstruction(
-                        authority.publicKey, recipientAta, recipient.publicKey, mint.publicKey, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
-                    )
-                );
-                await provider.connection.sendTransaction(tx, [((provider.wallet as anchor.Wallet).payer)]);
-            }
+            const recipientAta = await ensureRecipientAta();
 
             await program.methods
                 .freezeAccount()
-                .accounts({ operator: authority.publicKey, config: configPda, operatorRole: masterRolePda, mint: mint.publicKey, targetTokenAccount: recipientAta, tokenProgram: TOKEN_2022_PROGRAM_ID })
+                .accounts({
+                    operator: authority.publicKey,
+                    config: configPda,
+                    operatorRole: masterRolePda,
+                    mint: mint.publicKey,
+                    targetTokenAccount: recipientAta,
+                    tokenProgram: TOKEN_2022_PROGRAM_ID,
+                })
                 .rpc();
 
-            const account = await getAccount(provider.connection, recipientAta, "confirmed", TOKEN_2022_PROGRAM_ID);
+            const account = await getAccount(
+                provider.connection,
+                recipientAta,
+                "confirmed",
+                TOKEN_2022_PROGRAM_ID,
+            );
             expect(account.isFrozen).to.be.true;
         });
 
         it("thaws a frozen account", async () => {
             const [configPda] = findConfigPda();
             const [masterRolePda] = findRolePda(authority.publicKey, ROLE_MASTER);
-            const recipientAta = getAssociatedTokenAddressSync(mint.publicKey, recipient.publicKey, false, TOKEN_2022_PROGRAM_ID);
+            const recipientAta = await ensureRecipientAta();
 
             await program.methods
                 .thawAccount()
-                .accounts({ operator: authority.publicKey, config: configPda, operatorRole: masterRolePda, mint: mint.publicKey, targetTokenAccount: recipientAta, tokenProgram: TOKEN_2022_PROGRAM_ID })
+                .accounts({
+                    operator: authority.publicKey,
+                    config: configPda,
+                    operatorRole: masterRolePda,
+                    mint: mint.publicKey,
+                    targetTokenAccount: recipientAta,
+                    tokenProgram: TOKEN_2022_PROGRAM_ID,
+                })
                 .rpc();
 
-            const account = await getAccount(provider.connection, recipientAta, "confirmed", TOKEN_2022_PROGRAM_ID);
+            const account = await getAccount(
+                provider.connection,
+                recipientAta,
+                "confirmed",
+                TOKEN_2022_PROGRAM_ID,
+            );
             expect(account.isFrozen).to.be.false;
         });
 
