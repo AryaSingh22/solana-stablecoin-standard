@@ -76,6 +76,28 @@ describe("SSS-1 Unit Tests", () => {
         );
     }
 
+    async function waitForTokenAccount(account: PublicKey, retries = 20, delayMs = 250) {
+        for (let i = 0; i < retries; i += 1) {
+            try {
+                return await getAccount(
+                    provider.connection,
+                    account,
+                    "confirmed",
+                    TOKEN_2022_PROGRAM_ID,
+                );
+            } catch {
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+        }
+
+        return getAccount(
+            provider.connection,
+            account,
+            "confirmed",
+            TOKEN_2022_PROGRAM_ID,
+        );
+    }
+
     before(async () => {
         const wallets = [minter, burner, pauser, recipient];
         for (const wallet of wallets) {
@@ -234,7 +256,7 @@ describe("SSS-1 Unit Tests", () => {
                 TOKEN_2022_PROGRAM_ID,
             );
 
-            await program.methods
+            const mintSig = await program.methods
                 .mintTokens(new BN(1_000_000))
                 .accounts({
                     minter: minter.publicKey,
@@ -251,13 +273,9 @@ describe("SSS-1 Unit Tests", () => {
                 })
                 .signers([minter])
                 .rpc();
+            await provider.connection.confirmTransaction(mintSig, "confirmed");
 
-            const account = await getAccount(
-                provider.connection,
-                recipientAta,
-                "confirmed",
-                TOKEN_2022_PROGRAM_ID,
-            );
+            const account = await waitForTokenAccount(recipientAta);
             expect(Number(account.amount)).to.equal(1_000_000);
         });
 
@@ -408,7 +426,7 @@ describe("SSS-1 Unit Tests", () => {
                 TOKEN_2022_PROGRAM_ID,
             );
 
-            await program.methods
+            const mintSig = await program.methods
                 .mintTokens(new BN(500_000))
                 .accounts({
                     minter: minter.publicKey,
@@ -425,16 +443,12 @@ describe("SSS-1 Unit Tests", () => {
                 })
                 .signers([minter])
                 .rpc();
+            await provider.connection.confirmTransaction(mintSig, "confirmed");
 
-            const before = await getAccount(
-                provider.connection,
-                burnerAta,
-                "confirmed",
-                TOKEN_2022_PROGRAM_ID,
-            );
+            const before = await waitForTokenAccount(burnerAta);
             expect(Number(before.amount)).to.equal(500_000);
 
-            await program.methods
+            const burnSig = await program.methods
                 .burnTokens(new BN(100_000))
                 .accounts({
                     burner: burner.publicKey,
@@ -447,13 +461,9 @@ describe("SSS-1 Unit Tests", () => {
                 })
                 .signers([burner])
                 .rpc();
+            await provider.connection.confirmTransaction(burnSig, "confirmed");
 
-            const after = await getAccount(
-                provider.connection,
-                burnerAta,
-                "confirmed",
-                TOKEN_2022_PROGRAM_ID,
-            );
+            const after = await waitForTokenAccount(burnerAta);
             expect(Number(after.amount)).to.equal(400_000);
         });
 
@@ -533,7 +543,7 @@ describe("SSS-1 Unit Tests", () => {
             const [masterRolePda] = findRolePda(authority.publicKey, ROLE_MASTER);
             const recipientAta = await getOrInitRecipientAta();
 
-            await program.methods
+            const freezeSig = await program.methods
                 .freezeAccount()
                 .accounts({
                     operator: authority.publicKey,
@@ -544,13 +554,9 @@ describe("SSS-1 Unit Tests", () => {
                     tokenProgram: TOKEN_2022_PROGRAM_ID,
                 })
                 .rpc();
+            await provider.connection.confirmTransaction(freezeSig, "confirmed");
 
-            const account = await getAccount(
-                provider.connection,
-                recipientAta,
-                "confirmed",
-                TOKEN_2022_PROGRAM_ID,
-            );
+            const account = await waitForTokenAccount(recipientAta);
             expect(account.isFrozen).to.be.true;
         });
 
@@ -559,7 +565,7 @@ describe("SSS-1 Unit Tests", () => {
             const [masterRolePda] = findRolePda(authority.publicKey, ROLE_MASTER);
             const recipientAta = await getOrInitRecipientAta();
 
-            await program.methods
+            const thawSig = await program.methods
                 .thawAccount()
                 .accounts({
                     operator: authority.publicKey,
@@ -570,13 +576,9 @@ describe("SSS-1 Unit Tests", () => {
                     tokenProgram: TOKEN_2022_PROGRAM_ID,
                 })
                 .rpc();
+            await provider.connection.confirmTransaction(thawSig, "confirmed");
 
-            const account = await getAccount(
-                provider.connection,
-                recipientAta,
-                "confirmed",
-                TOKEN_2022_PROGRAM_ID,
-            );
+            const account = await waitForTokenAccount(recipientAta);
             expect(account.isFrozen).to.be.false;
         });
 
