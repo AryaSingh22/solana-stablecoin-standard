@@ -21,7 +21,6 @@ import {
     getAssociatedTokenAddressSync,
     ASSOCIATED_TOKEN_PROGRAM_ID,
     getAccount,
-    getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
 import { expect } from "chai";
 
@@ -228,18 +227,12 @@ describe("SSS-1 Unit Tests", () => {
             const [minterRolePda] = findRolePda(minter.publicKey, ROLE_MINTER);
             const [quotaPda] = findQuotaPda(minter.publicKey);
 
-            const recipientAtaAccount = await getOrCreateAssociatedTokenAccount(
-                provider.connection,
-                minter,
+            const recipientAta = getAssociatedTokenAddressSync(
                 mint.publicKey,
                 recipient.publicKey,
                 false,
-                "confirmed",
-                undefined,
                 TOKEN_2022_PROGRAM_ID,
-                ASSOCIATED_TOKEN_PROGRAM_ID,
             );
-            const recipientAta = recipientAtaAccount.address;
 
             await program.methods
                 .mintTokens(new BN(1_000_000))
@@ -408,18 +401,12 @@ describe("SSS-1 Unit Tests", () => {
                 })
                 .rpc();
 
-            const burnerAtaAccount = await getOrCreateAssociatedTokenAccount(
-                provider.connection,
-                burner,
+            const burnerAta = getAssociatedTokenAddressSync(
                 mint.publicKey,
                 burner.publicKey,
                 false,
-                "confirmed",
-                undefined,
                 TOKEN_2022_PROGRAM_ID,
-                ASSOCIATED_TOKEN_PROGRAM_ID,
             );
-            const burnerAta = burnerAtaAccount.address;
 
             await program.methods
                 .mintTokens(new BN(500_000))
@@ -498,25 +485,53 @@ describe("SSS-1 Unit Tests", () => {
     // freeze / thaw
     // =========================================================================
     describe("freeze / thaw", () => {
-        async function ensureRecipientAta(): Promise<PublicKey> {
-            const account = await getOrCreateAssociatedTokenAccount(
-                provider.connection,
-                minter,
+        async function getOrInitRecipientAta(): Promise<PublicKey> {
+            const [configPda] = findConfigPda();
+            const [pausePda] = findPausePda();
+            const [minterRolePda] = findRolePda(minter.publicKey, ROLE_MINTER);
+            const [quotaPda] = findQuotaPda(minter.publicKey);
+
+            const ata = getAssociatedTokenAddressSync(
                 mint.publicKey,
                 recipient.publicKey,
                 false,
-                "confirmed",
-                undefined,
                 TOKEN_2022_PROGRAM_ID,
-                ASSOCIATED_TOKEN_PROGRAM_ID,
             );
-            return account.address;
+
+            try {
+                await getAccount(
+                    provider.connection,
+                    ata,
+                    "confirmed",
+                    TOKEN_2022_PROGRAM_ID,
+                );
+            } catch {
+                await program.methods
+                    .mintTokens(new BN(1))
+                    .accounts({
+                        minter: minter.publicKey,
+                        config: configPda,
+                        pauseState: pausePda,
+                        minterRole: minterRolePda,
+                        minterQuota: quotaPda,
+                        mint: mint.publicKey,
+                        recipientTokenAccount: ata,
+                        recipient: recipient.publicKey,
+                        tokenProgram: TOKEN_2022_PROGRAM_ID,
+                        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+                        systemProgram: SystemProgram.programId,
+                    })
+                    .signers([minter])
+                    .rpc();
+            }
+
+            return ata;
         }
 
         it("freezes a token account", async () => {
             const [configPda] = findConfigPda();
             const [masterRolePda] = findRolePda(authority.publicKey, ROLE_MASTER);
-            const recipientAta = await ensureRecipientAta();
+            const recipientAta = await getOrInitRecipientAta();
 
             await program.methods
                 .freezeAccount()
@@ -542,7 +557,7 @@ describe("SSS-1 Unit Tests", () => {
         it("thaws a frozen account", async () => {
             const [configPda] = findConfigPda();
             const [masterRolePda] = findRolePda(authority.publicKey, ROLE_MASTER);
-            const recipientAta = await ensureRecipientAta();
+            const recipientAta = await getOrInitRecipientAta();
 
             await program.methods
                 .thawAccount()
