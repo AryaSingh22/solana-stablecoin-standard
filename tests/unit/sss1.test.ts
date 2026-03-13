@@ -78,15 +78,6 @@ describe("SSS-1 Unit Tests", () => {
     }
 
     before(async () => {
-        // Fund the provider wallet (payer) as well; several tests create ATAs client-side.
-        {
-            const sig = await provider.connection.requestAirdrop(
-                authority.publicKey,
-                2 * anchor.web3.LAMPORTS_PER_SOL,
-            );
-            await provider.connection.confirmTransaction(sig);
-        }
-
         const wallets = [minter, burner, pauser, recipient];
         for (const wallet of wallets) {
             const sig = await provider.connection.requestAirdrop(
@@ -239,7 +230,7 @@ describe("SSS-1 Unit Tests", () => {
 
             const recipientAtaAccount = await getOrCreateAssociatedTokenAccount(
                 provider.connection,
-                (provider.wallet as anchor.Wallet).payer,
+                minter,
                 mint.publicKey,
                 recipient.publicKey,
                 false,
@@ -419,7 +410,7 @@ describe("SSS-1 Unit Tests", () => {
 
             const burnerAtaAccount = await getOrCreateAssociatedTokenAccount(
                 provider.connection,
-                (provider.wallet as anchor.Wallet).payer,
+                burner,
                 mint.publicKey,
                 burner.publicKey,
                 false,
@@ -510,7 +501,7 @@ describe("SSS-1 Unit Tests", () => {
         async function ensureRecipientAta(): Promise<PublicKey> {
             const account = await getOrCreateAssociatedTokenAccount(
                 provider.connection,
-                (provider.wallet as anchor.Wallet).payer,
+                minter,
                 mint.publicKey,
                 recipient.publicKey,
                 false,

@@ -89,15 +89,6 @@ describe("SSS-2 Unit Tests", () => {
     }
 
     before(async () => {
-        // Fund the provider wallet (payer) as well; this suite may create ATAs client-side.
-        {
-            const sig = await provider.connection.requestAirdrop(
-                authority.publicKey,
-                2 * anchor.web3.LAMPORTS_PER_SOL,
-            );
-            await provider.connection.confirmTransaction(sig);
-        }
-
         // Fund wallets
         for (const kp of [minter, blacklister, target, treasury]) {
             const sig = await provider.connection.requestAirdrop(kp.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
