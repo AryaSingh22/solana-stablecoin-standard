@@ -88,6 +88,18 @@ describe("SSS-2 Unit Tests", () => {
         );
     }
 
+    async function waitForTokenAccount(account: PublicKey, retries = 20, delayMs = 250) {
+        for (let i = 0; i < retries; i += 1) {
+            try {
+                return await getAccount(provider.connection, account, "confirmed", TOKEN_2022_PROGRAM_ID);
+            } catch {
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+        }
+
+        return getAccount(provider.connection, account, "confirmed", TOKEN_2022_PROGRAM_ID);
+    }
+
     before(async () => {
         // Fund wallets
         for (const kp of [minter, blacklister, target, treasury]) {
@@ -231,7 +243,7 @@ describe("SSS-2 Unit Tests", () => {
             const [blacklistPda] = findBlacklistPda(target.publicKey);
             const targetAta = getAssociatedTokenAddressSync(mint2.publicKey, target.publicKey, false, TOKEN_2022_PROGRAM_ID);
 
-            await program.methods
+            const blacklistSig = await program.methods
                 .addToBlacklist("OFAC SDN — automated test entry")
                 .accounts({
                     operator: blacklister.publicKey,
@@ -246,12 +258,13 @@ describe("SSS-2 Unit Tests", () => {
                 })
                 .signers([blacklister])
                 .rpc();
+            await provider.connection.confirmTransaction(blacklistSig, "confirmed");
 
             const entry = await (program.account as any).blacklistEntry.fetch(blacklistPda);
             expect(entry.active).to.be.true;
             expect(entry.reason).to.equal("OFAC SDN — automated test entry");
 
-            const account = await getAccount(provider.connection, targetAta, "confirmed", TOKEN_2022_PROGRAM_ID);
+            const account = await waitForTokenAccount(targetAta);
             expect(account.isFrozen).to.be.true;
         });
 
